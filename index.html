@@ -3,20 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Asih Jaya Group - Kartu Stok V3</title>
+  <title>Asih Jaya Group - Kartu Stok V4</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    *{box-sizing:border-box} body{margin:0;font-family:Arial,sans-serif;background:#f4f6f8;color:#1f2937}
-    .wrap{max-width:1200px;margin:0 auto;padding:16px}.header{background:#0f172a;color:#fff;padding:18px;border-radius:14px;margin-bottom:16px}
-    .header h1{margin:0 0 4px;font-size:30px}.header p{margin:0;color:#cbd5e1}.card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:16px}
-    .menu{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}.menu button{border:none;background:#fff;padding:10px 14px;border-radius:10px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-    .menu button.active{background:#2563eb;color:#fff}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-    .field label{display:block;margin-bottom:6px;font-weight:bold;font-size:14px}.field input,.field select{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:10px;font-size:14px}
-    .actions{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}.btn{border:none;background:#2563eb;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer}
-    .btn.secondary{background:#334155}.btn.danger{background:#dc2626}.btn.warning{background:#d97706}.hidden{display:none}
-    table{width:100%;border-collapse:collapse;margin-top:12px;background:#fff}th,td{border:1px solid #e5e7eb;padding:10px;text-align:left;font-size:14px;vertical-align:top}th{background:#f8fafc}
-    .status-ok{color:#15803d;font-weight:bold}.status-bad{color:#dc2626;font-weight:bold}.status-warn{color:#d97706;font-weight:bold}.muted{color:#64748b}.result{white-space:pre-wrap;margin-top:10px;font-size:14px}
-    .topbar{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}.pill{background:#eff6ff;color:#1d4ed8;padding:8px 12px;border-radius:999px;font-size:13px}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial,sans-serif;background:#f4f6f8;color:#1f2937}
+    .wrap{max-width:1200px;margin:0 auto;padding:16px}
+    .header{background:#0f172a;color:#fff;padding:18px;border-radius:14px;margin-bottom:16px}
+    .header h1{margin:0 0 4px;font-size:30px}.header p{margin:0;color:#cbd5e1}
+    .card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:16px}
+    .menu{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+    .menu button{border:none;background:#fff;padding:10px 14px;border-radius:10px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+    .menu button.active{background:#2563eb;color:#fff}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .field label{display:block;margin-bottom:6px;font-weight:bold;font-size:14px}
+    .field input,.field select{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:10px;font-size:14px}
+    .actions{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+    .btn{border:none;background:#2563eb;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer}
+    .btn.secondary{background:#334155}.btn.danger{background:#dc2626}.btn.warning{background:#d97706}
+    .hidden{display:none}
+    table{width:100%;border-collapse:collapse;margin-top:12px;background:#fff}
+    th,td{border:1px solid #e5e7eb;padding:10px;text-align:left;font-size:14px;vertical-align:top}
+    th{background:#f8fafc}
+    .status-ok{color:#15803d;font-weight:bold}.status-bad{color:#dc2626;font-weight:bold}.status-warn{color:#d97706;font-weight:bold}.muted{color:#64748b}
+    .result{white-space:pre-wrap;margin-top:10px;font-size:14px}
+    .topbar{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+    .pill{background:#eff6ff;color:#1d4ed8;padding:8px 12px;border-radius:999px;font-size:13px}
+    img.preview{max-width:80px;border-radius:8px;border:1px solid #ddd}
     @media (max-width:900px){.grid,.grid-4{grid-template-columns:1fr}.header h1{font-size:24px}}
   </style>
 </head>
@@ -28,7 +42,7 @@
     </div>
 
     <div id="loginCard" class="card">
-      <h2>Login Admin / Gudang</h2>
+      <h2>Login Admin / Staff Gudang</h2>
       <div class="grid">
         <div class="field"><label>Email</label><input id="login_email" placeholder="email"></div>
         <div class="field"><label>Password</label><input id="login_password" type="password" placeholder="password"></div>
@@ -70,7 +84,7 @@
           <div id="readonlyGudangMsg" class="status-bad hidden">User gudang hanya bisa melihat data barang. Tambah / edit / hapus hanya untuk admin.</div>
           <div id="barangFormWrap">
             <div class="grid-4">
-              <div class="field"><label>Kode Barang</label><input id="barang_kode"></div>
+              <div class="field"><label>Kode Barang Otomatis</label><input id="barang_kode" readonly></div>
               <div class="field"><label>Nama Barang</label><input id="barang_nama"></div>
               <div class="field"><label>Barcode</label><input id="barang_barcode"></div>
               <div class="field"><label>Stok Awal</label><input id="barang_stok_awal" type="number"></div>
@@ -153,6 +167,11 @@
           <div class="actions"><button class="btn secondary" onclick="siapkanOpname()">Tampilkan Barang Lokasi Ini</button></div>
           <div id="opnameArea" class="result muted">Pilih gudang dan lokasi, lalu klik tombol di atas.</div>
         </div>
+
+        <div class="card">
+          <h2>Riwayat Opname</h2>
+          <div id="riwayatOpnameWrap"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -180,6 +199,15 @@
       document.querySelectorAll('.menu button').forEach(el => el.classList.remove('active'));
       document.getElementById('tab-' + tab).classList.remove('hidden');
       document.getElementById('tab-btn-' + tab).classList.add('active');
+    }
+
+    function isAdmin() {
+      return currentProfile?.role === 'admin';
+    }
+
+    function generateKodeBarang() {
+      const total = productsData.length + 1;
+      return 'ASH' + String(total).padStart(3, '0');
     }
 
     async function loginUser() {
@@ -228,23 +256,16 @@
     }
 
     function applyRoleUI() {
-      const isAdmin = currentProfile?.role === 'admin';
-      document.getElementById('barangFormWrap').classList.toggle('hidden', !isAdmin);
-      document.getElementById('readonlyGudangMsg').classList.toggle('hidden', isAdmin);
-    }
-
-    function isAdmin() {
-      return currentProfile?.role === 'admin';
+      const admin = isAdmin();
+      document.getElementById('barangFormWrap').classList.toggle('hidden', !admin);
+      document.getElementById('readonlyGudangMsg').classList.toggle('hidden', admin);
     }
 
     async function tesKoneksi() {
       try {
         const { error } = await client.from('products').select('id').limit(1);
-        if (error) {
-          setDebug('Koneksi gagal: ' + error.message, true);
-        } else {
-          setDebug('Koneksi Supabase berhasil.');
-        }
+        if (error) setDebug('Koneksi gagal: ' + error.message, true);
+        else setDebug('Koneksi Supabase berhasil.');
       } catch (e) {
         setDebug('Error koneksi: ' + e.message, true);
       }
@@ -255,52 +276,11 @@
       setDebug('Semua data berhasil di-refresh.');
     }
 
-    function isiDropdownBarangMasuk() {
-      const q = (document.getElementById('search_masuk').value || '').toLowerCase();
-      const select = document.getElementById('masuk_product');
-      select.innerHTML = '';
-      productsData
-        .filter(item => !q || (item.nama_barang || '').toLowerCase().includes(q) || (item.kode_barang || '').toLowerCase().includes(q))
-        .forEach(item => {
-          const opt = document.createElement('option');
-          opt.value = item.id;
-          opt.textContent = `${item.nama_barang} | ${item.gudang || '-'} | ${item.lokasi || '-'} | ${item.letak_barang || '-'}`;
-          select.appendChild(opt);
-        });
-    }
-
-    function isiDropdownBarangKeluar() {
-      const q = (document.getElementById('search_keluar').value || '').toLowerCase();
-      const select = document.getElementById('keluar_product');
-      select.innerHTML = '';
-      productsData
-        .filter(item => !q || (item.nama_barang || '').toLowerCase().includes(q) || (item.kode_barang || '').toLowerCase().includes(q))
-        .forEach(item => {
-          const opt = document.createElement('option');
-          opt.value = item.id;
-          opt.textContent = `${item.nama_barang} | ${item.gudang || '-'} | ${item.lokasi || '-'} | ${item.letak_barang || '-'}`;
-          select.appendChild(opt);
-        });
-    }
-
-    function hitungStokBarang(productId) {
-      const barang = productsData.find(x => x.id === productId);
-      const stokAwal = Number(barang?.stok_awal || 0);
-      let masuk = 0;
-      let keluar = 0;
-      transactionsData.forEach(trx => {
-        if (trx.product_id === productId) {
-          if (trx.jenis_transaksi === 'masuk') masuk += Number(trx.jumlah || 0);
-          if (trx.jenis_transaksi === 'keluar') keluar += Number(trx.jumlah || 0);
-        }
-      });
-      return stokAwal + masuk - keluar;
-    }
-
     async function loadProducts() {
       const { data, error } = await client.from('products').select('*').order('created_at', { ascending: false });
       if (error) return setDebug('Gagal load products: ' + error.message, true);
       productsData = data || [];
+      document.getElementById('barang_kode').value = generateKodeBarang();
       isiDropdownBarangMasuk();
       isiDropdownBarangKeluar();
       renderProductsTable();
@@ -318,6 +298,45 @@
       const { data, error } = await client.from('stock_opnames').select('*').order('created_at', { ascending: false });
       if (error) return setDebug('Gagal load opname: ' + error.message, true);
       opnamesData = data || [];
+      await renderRiwayatOpname();
+    }
+
+    function hitungStokBarang(productId) {
+      const barang = productsData.find(x => x.id === productId);
+      const stokAwal = Number(barang?.stok_awal || 0);
+      let masuk = 0;
+      let keluar = 0;
+      transactionsData.forEach(trx => {
+        if (trx.product_id === productId) {
+          if (trx.jenis_transaksi === 'masuk') masuk += Number(trx.jumlah || 0);
+          if (trx.jenis_transaksi === 'keluar') keluar += Number(trx.jumlah || 0);
+        }
+      });
+      return stokAwal + masuk - keluar;
+    }
+
+    function isiDropdownBarangMasuk() {
+      const q = (document.getElementById('search_masuk').value || '').toLowerCase();
+      const select = document.getElementById('masuk_product');
+      select.innerHTML = '';
+      productsData.filter(item => !q || (item.nama_barang || '').toLowerCase().includes(q) || (item.kode_barang || '').toLowerCase().includes(q)).forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item.id;
+        opt.textContent = `${item.nama_barang} | ${item.gudang || '-'} | ${item.lokasi || '-'} | ${item.letak_barang || '-'}`;
+        select.appendChild(opt);
+      });
+    }
+
+    function isiDropdownBarangKeluar() {
+      const q = (document.getElementById('search_keluar').value || '').toLowerCase();
+      const select = document.getElementById('keluar_product');
+      select.innerHTML = '';
+      productsData.filter(item => !q || (item.nama_barang || '').toLowerCase().includes(q) || (item.kode_barang || '').toLowerCase().includes(q)).forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item.id;
+        opt.textContent = `${item.nama_barang} | ${item.gudang || '-'} | ${item.lokasi || '-'} | ${item.letak_barang || '-'}`;
+        select.appendChild(opt);
+      });
     }
 
     function renderProductsTable() {
@@ -332,7 +351,6 @@
       let html = '<table><tr><th>Kode</th><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Letak</th><th>Stok Awal</th><th>Stok Saat Ini</th><th>Status</th>';
       if (isAdmin()) html += '<th>Aksi</th>';
       html += '</tr>';
-
       rows.forEach(item => {
         html += `<tr>
           <td>${item.kode_barang || ''}</td>
@@ -371,9 +389,7 @@
       let html = '<table><tr><th>Tanggal</th><th>Nama Barang</th><th>Jenis</th><th>Jumlah</th><th>Saldo Akhir</th><th>Gudang</th><th>Lokasi</th><th>Keterangan</th></tr>';
       rows.forEach(trx => {
         const barang = productsData.find(x => x.id === trx.product_id);
-        const semuaBarang = transactionsData
-          .filter(x => x.product_id === trx.product_id)
-          .sort((a,b) => new Date(a.tanggal) - new Date(b.tanggal));
+        const semuaBarang = transactionsData.filter(x => x.product_id === trx.product_id).sort((a,b) => new Date(a.tanggal) - new Date(b.tanggal));
         let saldo = Number(barang?.stok_awal || 0);
         for (const row of semuaBarang) {
           if (row.jenis_transaksi === 'masuk') saldo += Number(row.jumlah || 0);
@@ -397,7 +413,7 @@
 
     function resetFormBarang() {
       editingId = null;
-      document.getElementById('barang_kode').value = '';
+      document.getElementById('barang_kode').value = generateKodeBarang();
       document.getElementById('barang_nama').value = '';
       document.getElementById('barang_barcode').value = '';
       document.getElementById('barang_gudang').value = '';
@@ -546,7 +562,7 @@
         document.getElementById('opnameArea').innerHTML = '<span class="status-bad">Tidak ada barang di gudang/lokasi ini.</span>';
         return;
       }
-      let html = '<table><tr><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Letak</th><th>Stok Sistem</th><th>Stok Fisik</th><th>Aksi</th><th>Hasil</th></tr>';
+      let html = '<table><tr><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Letak</th><th>Stok Sistem</th><th>Stok Fisik</th><th>Foto Selfie</th><th>Aksi</th><th>Hasil</th></tr>';
       rows.forEach(item => {
         const stokSistem = hitungStokBarang(item.id);
         html += `<tr>
@@ -556,6 +572,7 @@
           <td>${item.letak_barang || ''}</td>
           <td>${stokSistem}</td>
           <td><input type="number" id="fisik_${item.id}" placeholder="Isi stok fisik"></td>
+          <td><input type="file" id="foto_${item.id}" accept="image/*" capture="user"></td>
           <td><button class="btn secondary" onclick="simpanOpnameItem('${item.id}')">Simpan Opname</button></td>
           <td id="hasil_${item.id}"></td>
         </tr>`;
@@ -566,10 +583,27 @@
 
     async function simpanOpnameItem(productId) {
       const barang = productsData.find(x => x.id === productId);
+      if (!barang) return setDebug('Barang tidak ditemukan.', true);
+
       const stokSistem = hitungStokBarang(productId);
       const stokFisik = Number(document.getElementById('fisik_' + productId).value || 0);
       const selisih = stokFisik - stokSistem;
       const status = selisih === 0 ? 'sesuai' : 'tidak sesuai';
+
+      const fileInput = document.getElementById('foto_' + productId);
+      const file = fileInput?.files?.[0];
+      if (!file) return setDebug('Foto selfie opname wajib diambil.', true);
+
+      const fileExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+      const fileName = `${productId}-${Date.now()}.${fileExt}`;
+      const filePath = `opname/${fileName}`;
+
+      const { error: uploadError } = await client.storage
+        .from('opname-foto')
+        .upload(filePath, file, { upsert: false });
+
+      if (uploadError) return setDebug('Gagal upload foto opname: ' + uploadError.message, true);
+
       const payload = {
         product_id: productId,
         gudang: barang.gudang || '',
@@ -578,16 +612,52 @@
         stok_fisik: stokFisik,
         selisih: selisih,
         status: status,
-        catatan: status === 'sesuai' ? 'Stok sesuai' : 'Stok tidak sesuai, periksa kembali opname Anda'
+        catatan: status === 'sesuai' ? 'Stok sesuai' : 'Stok tidak sesuai, periksa kembali opname Anda',
+        foto_opname_url: filePath,
+        petugas_opname: currentProfile?.nama || currentUser?.email || ''
       };
+
       const { error } = await client.from('stock_opnames').insert([payload]);
       if (error) return setDebug('Gagal simpan opname: ' + error.message, true);
+
       const hasilEl = document.getElementById('hasil_' + productId);
       hasilEl.innerHTML = status === 'sesuai'
         ? '<span class="status-ok">Stok sesuai</span>'
         : '<span class="status-bad">Stok tidak sesuai, periksa kembali opname Anda</span>';
       setDebug('Opname berhasil disimpan.');
       await loadOpnames();
+    }
+
+    async function lihatFotoOpname(filePath) {
+      if (!filePath) return setDebug('Foto opname tidak tersedia', true);
+      const { data, error } = await client.storage.from('opname-foto').createSignedUrl(filePath, 60);
+      if (error) return setDebug('Gagal membuka foto: ' + error.message, true);
+      window.open(data.signedUrl, '_blank');
+    }
+
+    async function renderRiwayatOpname() {
+      let html = '<table><tr><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Stok Sistem</th><th>Stok Fisik</th><th>Selisih</th><th>Status</th><th>Petugas</th>';
+      if (isAdmin()) html += '<th>Foto Opname</th>';
+      html += '</tr>';
+
+      opnamesData.forEach(op => {
+        const barang = productsData.find(x => x.id === op.product_id);
+        html += `<tr>
+          <td>${barang?.nama_barang || ''}</td>
+          <td>${op.gudang || ''}</td>
+          <td>${op.lokasi || ''}</td>
+          <td>${op.stok_sistem || 0}</td>
+          <td>${op.stok_fisik || 0}</td>
+          <td>${op.selisih || 0}</td>
+          <td class="${op.status === 'sesuai' ? 'status-ok' : 'status-bad'}">${op.status || ''}</td>
+          <td>${op.petugas_opname || ''}</td>`;
+        if (isAdmin()) {
+          html += `<td><button class="btn secondary" onclick="lihatFotoOpname('${op.foto_opname_url || ''}')">Lihat Foto</button></td>`;
+        }
+        html += '</tr>';
+      });
+      html += '</table>';
+      document.getElementById('riwayatOpnameWrap').innerHTML = html;
     }
 
     window.addEventListener('load', cekSession);
