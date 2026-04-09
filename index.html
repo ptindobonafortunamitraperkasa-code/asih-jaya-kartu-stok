@@ -1325,8 +1325,215 @@
       html += '</table>';
       openPrintWindow('Opname', html);
     }
+<script>
+<script>
 
-    window.addEventListener('load', cekSession);
-  </script>
+// ================= CONFIG =================
+const SUPABASE_URL = 'https://dvpyetgzpkmfqbjboihz.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2cHlldGd6cGttZnFiamJvaWh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyNzk4MDEsImV4cCI6MjA5MDg1NTgwMX0.FNKl_4SjPrfyHHyN3RNoRXVKAL2_1VUCtRGMh7LjQwU';
+const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ================= STATE =================
+let productsData = [];
+let transactionsData = [];
+let opnamesData = [];
+let editingId = null;
+
+// ================= LOAD DATA =================
+async function loadSemua(){
+  await loadProducts();
+  await loadTransactions();
+  await loadOpnames();
+}
+
+async function loadProducts(){
+  const {data} = await client.from('products').select('*');
+  productsData = data || [];
+  renderProductsTable();
+  isiFilterItem();
+}
+
+async function loadTransactions(){
+  const {data} = await client.from('stock_transactions').select('*');
+  transactionsData = data || [];
+  renderKartuStok();
+}
+
+async function loadOpnames(){
+  const {data} = await client.from('stock_opnames').select('*');
+  opnamesData = data || [];
+}
+
+// ================= STOK =================
+function hitungStokBarang(id){
+  let barang = productsData.find(x=>x.id==id);
+  let stok = Number(barang?.stok_awal || 0);
+
+  transactionsData.forEach(t=>{
+    if(t.product_id==id){
+      if(t.jenis_transaksi=='masuk') stok += Number(t.jumlah);
+      if(t.jenis_transaksi=='keluar') stok -= Number(t.jumlah);
+    }
+  });
+
+  return stok;
+}
+
+// ================= RENDER BARANG =================
+function renderProductsTable(){
+  let html = "<table border=1><tr><th>Nama</th><th>Stok</th><th>Aksi</th></tr>";
+
+  productsData.forEach(d=>{
+    html += `<tr>
+      <td>${d.nama_barang}</td>
+      <td>${hitungStokBarang(d.id)}</td>
+      <td>
+        <button onclick="editBarang('${d.id}')">Edit</button>
+        <button onclick="hapusBarang('${d.id}')">Hapus</button>
+      </td>
+    </tr>`;
+  });
+
+  html += "</table>";
+  document.getElementById('productsTableWrap').innerHTML = html;
+}
+
+// ================= EDIT =================
+function editBarang(id){
+  let d = productsData.find(x=>x.id==id);
+  if(!d) return alert("Data tidak ditemukan");
+
+  editingId = id;
+
+  document.getElementById('barang_nama').value = d.nama_barang;
+  document.getElementById('barang_gudang').value = d.gudang;
+  document.getElementById('barang_lokasi').value = d.lokasi;
+  document.getElementById('barang_letak').value = d.letak_barang;
+
+  alert("Mode edit aktif");
+}
+
+async function updateBarang(){
+  if(!editingId) return alert("Tidak ada data");
+
+  await client.from('products').update({
+    nama_barang: document.getElementById('barang_nama').value,
+    gudang: document.getElementById('barang_gudang').value,
+    lokasi: document.getElementById('barang_lokasi').value,
+    letak_barang: document.getElementById('barang_letak').value
+  }).eq('id', editingId);
+
+  alert("Update berhasil");
+  editingId = null;
+  loadProducts();
+}
+
+// ================= HAPUS =================
+async function hapusBarang(id){
+  await client.from('products').delete().eq('id', id);
+  alert("Data dihapus");
+  loadProducts();
+}
+
+// ================= OPNAME =================
+function siapkanOpname(){
+  let html = "<table border=1><tr><th>Barang</th><th>Stok Sistem</th><th>Stok Fisik</th><th>Aksi</th></tr>";
+
+  productsData.forEach(d=>{
+    html += `<tr>
+      <td>${d.nama_barang}</td>
+      <td>${hitungStokBarang(d.id)}</td>
+      <td><input id="fisik_${d.id}"></td>
+      <td><button onclick="simpanOpname('${d.id}')">Simpan</button></td>
+    </tr>`;
+  });
+
+  html += "</table>";
+  document.getElementById('opnameArea').innerHTML = html;
+}
+
+async function simpanOpname(id){
+  let stok = document.getElementById('fisik_'+id).value;
+
+  await client.from('stock_opnames').insert([{
+    product_id: id,
+    stok_fisik: Number(stok)
+  }]);
+
+  alert("Opname tersimpan");
+}
+
+// ================= FILTER =================
+function isiFilterItem(){
+  let select = document.getElementById('filter_item');
+  if(!select) return;
+
+  select.innerHTML = "<option value=''>SEMUA</option>";
+
+  productsData.forEach(d=>{
+    select.innerHTML += `<option value="${d.id}">${d.nama_barang}</option>`;
+  });
+}
+
+// ================= KARTU STOK =================
+function renderKartuStok(){
+  let filter = document.getElementById('filter_item')?.value;
+
+  let html = "<table border=1><tr><th>Barang</th><th>Masuk</th><th>Keluar</th></tr>";
+
+  transactionsData.forEach(t=>{
+    if(filter && t.product_id != filter) return;
+
+    let barang = productsData.find(x=>x.id==t.product_id);
+
+    html += `<tr>
+      <td>${barang?.nama_barang}</td>
+      <td>${t.jenis_transaksi=='masuk'?t.jumlah:''}</td>
+      <td>${t.jenis_transaksi=='keluar'?t.jumlah:''}</td>
+    </tr>`;
+  });
+
+  html += "</table>";
+  document.getElementById('kartuStokWrap').innerHTML = html;
+}
+
+// ================= EXPORT =================
+function exportExcel(){
+  let filter = document.getElementById('filter_item')?.value;
+
+  let rows = [["Barang","Masuk","Keluar"]];
+
+  transactionsData.forEach(t=>{
+    if(filter && t.product_id != filter) return;
+
+    let barang = productsData.find(x=>x.id==t.product_id);
+
+    rows.push([
+      barang?.nama_barang,
+      t.jenis_transaksi=='masuk'?t.jumlah:'',
+      t.jenis_transaksi=='keluar'?t.jumlah:''
+    ]);
+  });
+
+  let csv = rows.map(r=>r.join(",")).join("\\n");
+  let blob = new Blob([csv]);
+  let a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = "kartu_stok.csv";
+  a.click();
+}
+
+function exportPDF(){
+  let win = window.open();
+  win.document.write(document.getElementById('kartuStokWrap').innerHTML);
+  win.print();
+}
+
+// ================= AUTO LOAD =================
+window.onload = loadSemua;
+
+</script>
+
+</script>
 </body>
 </html>
