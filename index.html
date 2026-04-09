@@ -1937,6 +1937,272 @@
   window.exportKartuStokExcel = exportKartuStokExcel;
   window.exportKartuStokPDF = exportKartuStokPDF;
 })();
+</script
+  <script>
+(function () {
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector('script[src="' + src + '"]')) return resolve();
+      const s = document.createElement("script");
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  async function ensureExportLibs() {
+    if (!window.jspdf) {
+      await loadScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js");
+    }
+    if (!window.XLSX) {
+      await loadScript("https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js");
+    }
+    await loadScript("https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js");
+  }
+
+  function getKartuStokTable() {
+    if (document.querySelector("#kartu-stok-table")) {
+      return document.querySelector("#kartu-stok-table");
+    }
+
+    const tables = Array.from(document.querySelectorAll("table"));
+    for (const table of tables) {
+      const heads = Array.from(table.querySelectorAll("thead th")).map(th => th.innerText.trim().toLowerCase());
+      const joined = heads.join("|");
+      if (
+        joined.includes("tanggal") &&
+        joined.includes("nama barang") &&
+        joined.includes("saldo akhir")
+      ) {
+        return table;
+      }
+    }
+    return null;
+  }
+
+  function ensureToolbar() {
+    if (document.getElementById("toolbar-export-kartu-stok")) return;
+
+    const table = getKartuStokTable();
+    if (!table) return;
+
+    const wrap = document.createElement("div");
+    wrap.id = "toolbar-export-kartu-stok";
+    wrap.style.display = "flex";
+    wrap.style.gap = "10px";
+    wrap.style.flexWrap = "wrap";
+    wrap.style.margin = "12px 0";
+
+    wrap.innerHTML = `
+      <button type="button" id="btn-pilih-semua-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#334155; color:#fff; font-weight:700; cursor:pointer;">Pilih Semua</button>
+      <button type="button" id="btn-batal-pilih-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#64748b; color:#fff; font-weight:700; cursor:pointer;">Batal Pilih</button>
+      <button type="button" id="btn-export-excel-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#0f766e; color:#fff; font-weight:700; cursor:pointer;">Export Excel</button>
+      <button type="button" id="btn-export-pdf-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#16a34a; color:#fff; font-weight:700; cursor:pointer;">Export PDF</button>
+    `;
+
+    table.parentElement.insertBefore(wrap, table);
+
+    document.getElementById("btn-pilih-semua-kartu-stok").onclick = pilihSemuaKartuStok;
+    document.getElementById("btn-batal-pilih-kartu-stok").onclick = batalPilihKartuStok;
+    document.getElementById("btn-export-excel-kartu-stok").onclick = exportKartuStokExcel;
+    document.getElementById("btn-export-pdf-kartu-stok").onclick = exportKartuStokPDF;
+  }
+
+  function ensureCheckboxColumn() {
+    const table = getKartuStokTable();
+    if (!table) return;
+
+    const theadRow = table.querySelector("thead tr");
+    if (theadRow && !theadRow.querySelector(".th-pilih-kartu-stok")) {
+      const th = document.createElement("th");
+      th.className = "th-pilih-kartu-stok";
+      th.style.width = "40px";
+      th.innerHTML = `<input type="checkbox" id="check-all-kartu-stok" title="Pilih semua">`;
+      theadRow.insertBefore(th, theadRow.firstChild);
+
+      const checkAll = th.querySelector("#check-all-kartu-stok");
+      if (checkAll) {
+        checkAll.addEventListener("change", function () {
+          document.querySelectorAll(".pilih-kartu-stok").forEach(el => {
+            el.checked = this.checked;
+          });
+        });
+      }
+    }
+
+    const rows = table.querySelectorAll("tbody tr");
+    rows.forEach((tr, idx) => {
+      if (tr.querySelector(".pilih-kartu-stok")) return;
+      const td = document.createElement("td");
+      td.style.textAlign = "center";
+      td.innerHTML = `<input type="checkbox" class="pilih-kartu-stok" data-row="${idx}">`;
+      tr.insertBefore(td, tr.firstChild);
+    });
+  }
+
+  window.pilihSemuaKartuStok = function () {
+    document.querySelectorAll(".pilih-kartu-stok").forEach(el => el.checked = true);
+    const all = document.getElementById("check-all-kartu-stok");
+    if (all) all.checked = true;
+  };
+
+  window.batalPilihKartuStok = function () {
+    document.querySelectorAll(".pilih-kartu-stok").forEach(el => el.checked = false);
+    const all = document.getElementById("check-all-kartu-stok");
+    if (all) all.checked = false;
+  };
+
+  function getVisibleRows() {
+    const table = getKartuStokTable();
+    if (!table) return [];
+    return Array.from(table.querySelectorAll("tbody tr")).filter(tr => {
+      const style = window.getComputedStyle(tr);
+      return style.display !== "none" && style.visibility !== "hidden";
+    });
+  }
+
+  function ambilText(td) {
+    return (td?.innerText || "").trim();
+  }
+
+  function extractRowsForExport() {
+    const allRows = getVisibleRows();
+    if (!allRows.length) return [];
+
+    const checkedRows = allRows.filter(tr => {
+      const cb = tr.querySelector(".pilih-kartu-stok");
+      return cb && cb.checked;
+    });
+
+    const targetRows = checkedRows.length ? checkedRows : allRows;
+
+    return targetRows.map((tr, i) => {
+      const tds = tr.querySelectorAll("td");
+
+      return {
+        no: i + 1,
+        tanggal: ambilText(tds[1]),
+        kode: ambilText(tds[2]),
+        nama_barang: ambilText(tds[3]),
+        masuk: ambilText(tds[4]),
+        keluar: ambilText(tds[5]),
+        saldo_akhir: ambilText(tds[6]),
+        gudang: ambilText(tds[7]),
+        lokasi: ambilText(tds[8]),
+        keterangan: ambilText(tds[9])
+      };
+    });
+  }
+
+  window.exportKartuStokExcel = async function () {
+    try {
+      await ensureExportLibs();
+
+      const rows = extractRowsForExport();
+      if (!rows.length) {
+        alert("Data kartu stok tidak ada.");
+        return;
+      }
+
+      const data = rows.map(x => ({
+        No: x.no,
+        Tanggal: x.tanggal,
+        Kode: x.kode,
+        "Nama Barang": x.nama_barang,
+        Masuk: x.masuk,
+        Keluar: x.keluar,
+        "Saldo Akhir": x.saldo_akhir,
+        Gudang: x.gudang,
+        Lokasi: x.lokasi,
+        Keterangan: x.keterangan
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Kartu Stok");
+      XLSX.writeFile(wb, "kartu_stok.xlsx");
+    } catch (err) {
+      console.error(err);
+      alert("Gagal export Excel: " + err.message);
+    }
+  };
+
+  window.exportKartuStokPDF = async function () {
+    try {
+      await ensureExportLibs();
+
+      const rows = extractRowsForExport();
+      if (!rows.length) {
+        alert("Data kartu stok tidak ada.");
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF("l", "mm", "a4");
+
+      doc.setFontSize(14);
+      doc.text("Laporan Kartu Stok", 14, 12);
+
+      doc.setFontSize(9);
+      doc.text("Sumber: data yang tampil di tabel", 14, 18);
+
+      doc.autoTable({
+        startY: 22,
+        head: [[
+          "No", "Tanggal", "Kode", "Nama Barang", "Masuk", "Keluar",
+          "Saldo Akhir", "Gudang", "Lokasi", "Keterangan"
+        ]],
+        body: rows.map(x => [
+          x.no,
+          x.tanggal,
+          x.kode,
+          x.nama_barang,
+          x.masuk,
+          x.keluar,
+          x.saldo_akhir,
+          x.gudang,
+          x.lokasi,
+          x.keterangan
+        ]),
+        styles: {
+          fontSize: 8,
+          cellPadding: 2
+        },
+        margin: {
+          top: 22,
+          right: 8,
+          bottom: 10,
+          left: 8
+        }
+      });
+
+      doc.save("kartu_stok.pdf");
+    } catch (err) {
+      console.error(err);
+      alert("Gagal export PDF: " + err.message);
+    }
+  };
+
+  function initKartuStokExport() {
+    ensureToolbar();
+    ensureCheckboxColumn();
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    setTimeout(initKartuStokExport, 500);
+    setTimeout(initKartuStokExport, 1200);
+  });
+
+  const observer = new MutationObserver(() => {
+    initKartuStokExport();
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+})();
 </script>
 </body>
 </html>
