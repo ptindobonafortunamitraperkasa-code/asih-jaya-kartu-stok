@@ -2184,25 +2184,6 @@
     }
   };
 
-  function initKartuStokExport() {
-    ensureToolbar();
-    ensureCheckboxColumn();
-  }
-
-  document.addEventListener("DOMContentLoaded", function () {
-    setTimeout(initKartuStokExport, 500);
-    setTimeout(initKartuStokExport, 1200);
-  });
-
-  const observer = new MutationObserver(() => {
-    initKartuStokExport();
-  });
-
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
-})();
 </script>
 </body>
 </html>
