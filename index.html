@@ -1048,7 +1048,9 @@
         });
       }
 
-      const validRows = rows.filter(r => r.nama_barang);
+   const validRows = rows.filter(r => {
+  return r.nama_barang || r.nama || r.kode || r.barcode;
+});
 
       if (validRows.length === 0) {
         setDebug('Tidak ada data barang valid untuk diimport.', true);
