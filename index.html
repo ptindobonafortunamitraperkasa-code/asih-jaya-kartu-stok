@@ -1495,10 +1495,10 @@ async function importBarangCSV() {
       });
     }
 
-    if (!dataInsert.length) {
-      alert('Tidak ada data valid');
-      return;
-    }
+ if (!dataInsert.length) {
+  alert('Tidak ada data valid');
+  return;
+}
 
     const { error } = await client.from('products').insert(dataInsert);
 
