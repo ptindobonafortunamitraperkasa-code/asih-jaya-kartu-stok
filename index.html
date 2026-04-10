@@ -1203,6 +1203,7 @@ async function loadProducts() {
       win.print();
     }
 
+
     function buildStokRows(data) {
       const rows = [[
         'Kode Barang',
@@ -1503,26 +1504,24 @@ window.exportPDF = function(){
       <th>Gudang</th>
       <th>Lokasi</th>
     </tr>
-    ${
-      data.map((tr,i)=>{
-        const td = tr.querySelectorAll("td");
-        return `
-        <tr>
-          <td>${i+1}</td>
-          <td>${td[1]?.innerText||""}</td>
-          <td>${td[2]?.innerText||""}</td>
-          <td>${td[3]?.innerText||""}</td>
-          <td>${td[4]?.innerText||""}</td>
-          <td>${td[5]?.innerText||""}</td>
-          <td>${td[6]?.innerText||""}</td>
-          <td>${td[7]?.innerText||""}</td>
-          <td>${td[8]?.innerText||""}</td>
-        </tr>`;
-      }).join("")
-    }
-  </table>
-  `;
+    
+const rowsHtml = data.map((tr,i)=>{
+  const td = tr.querySelectorAll("td");
 
+  return '<tr>' +
+    '<td>' + (i+1) + '</td>' +
+    '<td>' + (td[1]?.innerText || '') + '</td>' +
+    '<td>' + (td[2]?.innerText || '') + '</td>' +
+    '<td>' + (td[3]?.innerText || '') + '</td>' +
+    '<td>' + (td[4]?.innerText || '') + '</td>' +
+    '<td>' + (td[5]?.innerText || '') + '</td>' +
+    '<td>' + (td[6]?.innerText || '') + '</td>' +
+    '<td>' + (td[7]?.innerText || '') + '</td>' +
+    '<td>' + (td[8]?.innerText || '') + '</td>' +
+  '</tr>';
+}).join('');
+
+const html = '<table>' + rowsHtml + '</table>';
 
 })();
 </script>
