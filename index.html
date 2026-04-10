@@ -1183,20 +1183,7 @@ async function loadProducts() {
       }
     });
 
-    localStorage.setItem('data_barang', JSON.stringify(barangLama));
-
-    if (typeof loadDataBarang === 'function') loadDataBarang();
-    if (typeof renderTableBarang === 'function') renderTableBarang();
-    if (typeof tampilkanDataBarang === 'function') tampilkanDataBarang();
-
-    fileInput.value = '';
-    setDebug(`Import berhasil. ${rows.length} data diproses.`, false);
-
-  } catch (err) {
-    console.error(err);
-    setDebug('Terjadi error saat import CSV: ' + err.message, true);
-  }
-}
+  
     function downloadCSV(filename, rows) {
       const csvContent = rows.map(row =>
         row.map(value => {
@@ -1436,28 +1423,103 @@ async function loadProducts() {
       openPrintWindow('Barang Keluar', html);
     }
 
-    function exportOpnamePDF() {
-      let html = '<table><tr><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Stok Sistem</th><th>Stok Fisik</th><th>Selisih</th><th>Status</th><th>Keterangan</th><th>Petugas</th></tr>';
-      opnamesData.forEach(op => {
-        const barang = productsData.find(x => x.id === op.product_id);
-        html += `<tr>
-          <td>${barang?.nama_barang || ''}</td>
-          <td>${op.gudang || ''}</td>
-          <td>${op.lokasi || ''}</td>
-          <td>${op.stok_sistem || 0}</td>
-          <td>${op.stok_fisik || 0}</td>
-          <td>${op.selisih || 0}</td>
-          <td>${op.status || ''}</td>
-          <td>${op.keterangan || ''}</td>
-          <td>${op.petugas_opname || ''}</td>
-        </tr>`;
-      });
-      html += '</table>';
-      openPrintWindow('Opname', html);
+function exportOpnamePDF() {
+  let html = '<table><tr><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Stok Sistem</th><th>Stok Fisik</th><th>Selisih</th><th>Status</th><th>Keterangan</th><th>Petugas</th></tr>';
+  opnamesData.forEach(op => {
+    const barang = productsData.find(x => x.id === op.product_id);
+    html += `<tr>
+      <td>${barang?.nama_barang || ''}</td>
+      <td>${op.gudang || ''}</td>
+      <td>${op.lokasi || ''}</td>
+      <td>${op.stok_sistem || 0}</td>
+      <td>${op.stok_fisik || 0}</td>
+      <td>${op.selisih || 0}</td>
+      <td>${op.status || ''}</td>
+      <td>${op.keterangan || ''}</td>
+      <td>${op.petugas_opname || ''}</td>
+    </tr>`;
+  });
+  html += '</table>';
+  openPrintWindow('Opname', html);
+}
+
+async function importBarangCSV() {
+  try {
+    if (!isAdmin()) {
+      alert('Hanya admin yang bisa import');
+      return;
     }
 
-    window.addEventListener('load', cekSession);
+    const file = document.getElementById('import_barang_file').files[0];
+    if (!file) {
+      alert('Pilih file CSV dulu');
+      return;
+    }
 
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).filter(x => x.trim());
+
+    if (lines.length < 2) {
+      alert('CSV kosong / tidak valid');
+      return;
+    }
+
+    const delimiter = lines[0].includes(';') ? ';' : ',';
+    const headers = lines[0].toLowerCase().split(delimiter).map(x => x.trim());
+
+    function ambil(cols, nama) {
+      const i = headers.indexOf(nama);
+      return i !== -1 ? cols[i] : '';
+    }
+
+    const dataInsert = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(delimiter);
+
+      const kode_barang = ambil(cols, 'kode_barang') || ambil(cols, 'kode');
+      const nama_barang = ambil(cols, 'nama_barang') || ambil(cols, 'nama');
+
+      if (!kode_barang || !nama_barang) continue;
+
+      dataInsert.push({
+        kode_barang: kode_barang.trim(),
+        nama_barang: nama_barang.trim(),
+        barcode: ambil(cols, 'barcode'),
+        gudang: ambil(cols, 'gudang'),
+        lokasi: ambil(cols, 'lokasi'),
+        letak_barang: ambil(cols, 'letak') || ambil(cols, 'letak_barang'),
+        stok_awal: Number(ambil(cols, 'stok') || ambil(cols, 'stok_awal') || 0),
+        stok_minimum: Number(ambil(cols, 'stok_minimum') || 0),
+        status: ambil(cols, 'status') || 'aktif'
+      });
+    }
+
+    if (!dataInsert.length) {
+      alert('Tidak ada data valid');
+      return;
+    }
+
+    const { error } = await client.from('products').insert(dataInsert);
+
+    if (error) {
+      alert('Gagal import: ' + error.message);
+      return;
+    }
+
+    alert('Import berhasil: ' + dataInsert.length + ' data');
+
+    await loadProducts();
+    await loadTransactions();
+    renderDashboard();
+    renderProductsTable();
+  } catch (err) {
+    console.error(err);
+    alert('Error import: ' + err.message);
+  }
+}
+
+window.addEventListener('load', cekSession);
 </script>
 </body>
 </html>
