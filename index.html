@@ -1022,32 +1022,68 @@ async function loadProducts() {
       document.getElementById('riwayatOpnameWrap').innerHTML = html;
     }
 
- async function importBarangCSV() {
-  if (!isAdmin()) {
-    setDebug('Hanya admin yang bisa import data barang.', true);
+
+  const file = document.getElementById('import_barang_file').files[0];
+  if (!file) return alert('Pilih file CSV dulu');
+
+  const text = await file.text();
+  const lines = text.split(/\r?\n/).filter(x => x.trim());
+
+  if (lines.length < 2) {
+    alert('CSV kosong / tidak valid');
     return;
   }
 
-  const fileInput = document.getElementById('import_barang_file');
-  const file = fileInput?.files?.[0];
+  const delimiter = lines[0].includes(';') ? ';' : ',';
 
-  if (!file) {
-    setDebug('Pilih file CSV dulu.', true);
+  const headers = lines[0].toLowerCase().split(delimiter).map(x => x.trim());
+
+  function ambil(cols, nama) {
+    const i = headers.indexOf(nama);
+    return i !== -1 ? cols[i] : '';
+  }
+
+  const dataInsert = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(delimiter);
+
+    const kode_barang = ambil(cols, 'kode_barang') || ambil(cols, 'kode');
+    const nama_barang = ambil(cols, 'nama_barang') || ambil(cols, 'nama');
+
+    if (!kode_barang || !nama_barang) continue;
+
+    dataInsert.push({
+      kode_barang: kode_barang.trim(),
+      nama_barang: nama_barang.trim(),
+      barcode: ambil(cols, 'barcode'),
+      gudang: ambil(cols, 'gudang'),
+      lokasi: ambil(cols, 'lokasi'),
+      letak_barang: ambil(cols, 'letak') || ambil(cols, 'letak_barang'),
+      stok_awal: Number(ambil(cols, 'stok') || ambil(cols, 'stok_awal') || 0),
+      stok_minimum: Number(ambil(cols, 'stok_minimum') || 0),
+      status: ambil(cols, 'status') || 'aktif'
+    });
+  }
+
+  if (!dataInsert.length) {
+    alert('Tidak ada data valid');
     return;
   }
 
-  try {
-    const text = await file.text();
+  const { error } = await client.from('products').insert(dataInsert);
 
-    const lines = text
-      .split(/\r?\n/)
-      .map(x => x.trim())
-      .filter(x => x);
+  if (error) {
+    alert('Gagal import: ' + error.message);
+    return;
+  }
 
-    if (lines.length < 2) {
-      setDebug('File CSV kosong atau tidak valid.', true);
-      return;
-    }
+  alert('Import berhasil: ' + dataInsert.length + ' data');
+
+  // reload data
+  await loadProducts();
+  renderProductsTable();
+}
 
     const delimiter = lines[0].includes(';') ? ';' : ',';
 
