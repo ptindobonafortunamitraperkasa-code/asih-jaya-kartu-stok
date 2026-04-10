@@ -1012,65 +1012,100 @@
       document.getElementById('riwayatOpnameWrap').innerHTML = html;
     }
 
-    async function importBarangCSV() {
-      if (!isAdmin()) return setDebug('Hanya admin yang bisa import data barang.', true);
+   async function importBarangCSV() {
+  if (!isAdmin()) return setDebug('Hanya admin yang bisa import data barang.', true);
 
-      const fileInput = document.getElementById('import_barang_file');
-      const file = fileInput.files[0];
+  const fileInput = document.getElementById('import_barang_file');
+  const file = fileInput.files[0];
 
-      if (!file) {
-        setDebug('Pilih file CSV dulu.', true);
-        return;
-      }
+  if (!file) {
+    setDebug('Pilih file CSV dulu.', true);
+    return;
+  }
 
-      const text = await file.text();
-      const lines = text.split('\n').map(x => x.trim()).filter(x => x);
+  try {
+    const text = await file.text();
+    const cleanText = text.replace(/^\uFEFF/, '').replace(/\r/g, '');
+    const lines = cleanText.split('\n').map(x => x.trim()).filter(x => x);
 
-      if (lines.length < 2) {
-        setDebug('File CSV kosong atau tidak valid.', true);
-        return;
-      }
-
-      const rows = [];
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',').map(x => x.replace(/^"|"$/g, '').trim());
-
-        rows.push({
-          kode_barang: cols[0] || ('ASH' + String(productsData.length + i).padStart(3, '0')),
-          nama_barang: cols[1] || '',
-          barcode: cols[2] || '',
-          stok_awal: Number(cols[3] || 0),
-          gudang: cols[4] || '',
-          lokasi: cols[5] || '',
-          letak_barang: cols[6] || '',
-          status: cols[7] || 'aktif',
-          stok_minimum: Number(cols[8] || 0)
-        });
-      }
-
-   const validRows = rows.filter(r => {
-  return r.nama_barang || r.nama || r.kode || r.barcode;
-});
-
-      if (validRows.length === 0) {
-        setDebug('Tidak ada data barang valid untuk diimport.', true);
-        return;
-      }
-
-      const { error } = await client.from('products').insert(validRows);
-
-      if (error) {
-        setDebug('Gagal import barang: ' + error.message, true);
-        return;
-      }
-
-      setDebug('Import data barang berhasil: ' + validRows.length + ' item');
-      fileInput.value = '';
-      await loadProducts();
-      await loadTransactions();
-      renderDashboard();
+    if (lines.length < 2) {
+      setDebug('File CSV kosong atau tidak valid.', true);
+      return;
     }
 
+    const delimiter = lines[0].includes(';') ? ';' : ',';
+
+    function parseCSVLine(line, delimiterChar) {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        const next = line[i + 1];
+
+        if (char === '"') {
+          if (inQuotes && next === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === delimiterChar && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+
+      result.push(current.trim());
+      return result.map(x => x.replace(/^"|"$/g, '').trim());
+    }
+
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseCSVLine(lines[i], delimiter);
+
+      rows.push({
+        kode_barang: cols[0] || ('ASH' + String(productsData.length + i).padStart(3, '0')),
+        nama_barang: cols[1] || '',
+        barcode: cols[2] || '',
+        stok_awal: Number(String(cols[3] || 0).replace(/[^\d.-]/g, '')) || 0,
+        gudang: cols[4] || '',
+        lokasi: cols[5] || '',
+        letak_barang: cols[6] || '',
+        status: cols[7] || 'aktif',
+        stok_minimum: Number(String(cols[8] || 0).replace(/[^\d.-]/g, '')) || 0
+      });
+    }
+
+    const validRows = rows.filter(r =>
+      r.nama_barang || r.kode_barang || r.barcode
+    );
+
+    if (validRows.length === 0) {
+      setDebug('Tidak ada data barang valid untuk diimport.', true);
+      return;
+    }
+
+    const { error } = await client.from('products').insert(validRows);
+
+    if (error) {
+      setDebug('Gagal import barang: ' + error.message, true);
+      return;
+    }
+
+    setDebug('Import data barang berhasil: ' + validRows.length + ' item');
+    fileInput.value = '';
+    await loadProducts();
+    await loadTransactions();
+    renderDashboard();
+  } catch (err) {
+    console.error(err);
+    setDebug('Gagal import CSV: ' + (err.message || err), true);
+  }
+}
     function downloadCSV(filename, rows) {
       const csvContent = rows.map(row =>
         row.map(value => {
