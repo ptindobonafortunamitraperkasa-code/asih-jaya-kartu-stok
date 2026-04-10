@@ -1,0 +1,1595 @@
+
+
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Asih Jaya Group - Kartu Stok Final</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      color: #1f2937;
+    }
+    .wrap {
+      max-width: 1250px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    .header {
+      background: #0f172a;
+      color: white;
+      padding: 18px;
+      border-radius: 14px;
+      margin-bottom: 16px;
+    }
+    .header h1 {
+      margin: 0 0 4px;
+      font-size: 30px;
+    }
+    .header p {
+      margin: 0;
+      color: #cbd5e1;
+    }
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      margin-bottom: 16px;
+    }
+    .menu {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .menu button {
+      border: none;
+      background: white;
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    .menu button.active {
+      background: #2563eb;
+      color: white;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .field label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+    .actions {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      border: none;
+      background: #2563eb;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .btn.secondary { background: #334155; }
+    .btn.danger { background: #dc2626; }
+    .btn.warning { background: #d97706; }
+    .hidden { display: none; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      background: white;
+    }
+    th, td {
+      border: 1px solid #e5e7eb;
+      padding: 10px;
+      text-align: left;
+      font-size: 14px;
+      vertical-align: top;
+    }
+    th { background: #f8fafc; }
+    .status-ok { color: #15803d; font-weight: bold; }
+    .status-bad { color: #dc2626; font-weight: bold; }
+    .status-warn { color: #d97706; font-weight: bold; }
+    .muted { color: #64748b; }
+    .result {
+      white-space: pre-wrap;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    @media (max-width: 900px) {
+      .grid, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .header h1 { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1>Asih Jaya Group</h1>
+      <p>Aplikasi Kartu Stok Final</p>
+    </div>
+
+    <div id="loginCard" class="card">
+      <h2>Login Admin / Staff Gudang</h2>
+      <div class="grid">
+        <div class="field">
+          <label>Email</label>
+          <input id="login_email" placeholder="email">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input id="login_password" type="password" placeholder="password">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" onclick="loginUser()">Login</button>
+        <button class="btn secondary" onclick="cekSession()">Cek Session</button>
+      </div>
+      <div id="loginInfo" class="result muted"></div>
+    </div>
+
+    <div id="appArea" class="hidden">
+      <div class="card">
+        <div class="topbar">
+          <div>
+            <strong id="sessionNama">-</strong><br>
+            <span id="sessionRole" class="muted">-</span>
+          </div>
+          <div class="actions">
+            <button class="btn secondary" onclick="tesKoneksi()">Tes Koneksi</button>
+            <button class="btn secondary" onclick="loadSemua()">Refresh Semua Data</button>
+            <button class="btn danger" onclick="logoutUser()">Logout</button>
+          </div>
+        </div>
+        <div id="debug" class="result muted"></div>
+      </div>
+
+      <div class="menu">
+        <button id="tab-btn-dashboard" class="active" onclick="showTab('dashboard')">Dashboard</button>
+        <button id="tab-btn-barang" onclick="showTab('barang')">Data Barang</button>
+        <button id="tab-btn-masuk" onclick="showTab('masuk')">Barang Masuk</button>
+        <button id="tab-btn-keluar" onclick="showTab('keluar')">Barang Keluar</button>
+        <button id="tab-btn-kartu" onclick="showTab('kartu')">Kartu Stok</button>
+        <button id="tab-btn-opname" onclick="showTab('opname')">Opname</button>
+      </div>
+
+      <div id="tab-dashboard" class="tab-content">
+        <div class="card">
+          <h2>Dashboard</h2>
+          <div class="grid-4">
+            <div class="card"><b>Total Barang</b><div id="dash_total_barang">0</div></div>
+            <div class="card"><b>Total Stok</b><div id="dash_total_stok">0</div></div>
+            <div class="card"><b>Stok Menipis</b><div id="dash_stok_menipis">0</div></div>
+            <div class="card"><b>Wajib Order</b><div id="dash_wajib_order">0</div></div>
+          </div>
+          <div id="dashboardNotif"></div>
+        </div>
+      </div>
+
+      <div id="tab-barang" class="tab-content hidden">
+        <div class="card">
+          <h2>Data Barang</h2>
+          <div id="readonlyGudangMsg" class="status-bad hidden">User gudang hanya bisa melihat data barang. Tambah / edit / hapus hanya untuk admin.</div>
+
+          <div id="barangFormWrap">
+            <div class="grid-4">
+              <div class="field">
+                <label>Kode Barang Otomatis</label>
+                <input id="barang_kode" readonly>
+              </div>
+              <div class="field">
+                <label>Nama Barang</label>
+                <input id="barang_nama">
+              </div>
+              <div class="field">
+                <label>Barcode</label>
+                <input id="barang_barcode">
+              </div>
+              <div class="field">
+                <label>Stok Awal</label>
+                <input id="barang_stok_awal" type="number">
+              </div>
+              <div class="field">
+                <label>Gudang</label>
+                <input id="barang_gudang">
+              </div>
+              <div class="field">
+                <label>Lokasi / Rak</label>
+                <input id="barang_lokasi">
+              </div>
+              <div class="field">
+                <label>Letak Barang</label>
+                <input id="barang_letak">
+              </div>
+              <div class="field">
+                <label>Stok Minimum</label>
+                <input id="barang_stok_minimum" type="number">
+              </div>
+              <div class="field">
+                <label>Status</label>
+                <select id="barang_status">
+                  <option value="aktif">aktif</option>
+                  <option value="nonaktif">nonaktif</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button id="btnSimpanBarang" class="btn" onclick="simpanBarang()">Simpan Data Barang</button>
+              <button id="btnUpdateBarang" class="btn warning hidden" onclick="updateBarang()">Update Barang</button>
+              <button class="btn secondary" onclick="resetFormBarang()">Reset Form</button>
+              <button class="btn secondary" onclick="loadProducts()">Load Data Barang</button>
+            </div>
+
+            <div class="actions">
+              <input type="file" id="import_barang_file" accept=".csv">
+              <button class="btn secondary" onclick="importBarangCSV()">Import Data Barang CSV</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Daftar Data Barang</h2>
+          <div class="grid">
+            <div class="field">
+              <label>Cari Nama / Kode</label>
+              <input id="cari_barang" oninput="renderProductsTable()">
+            </div>
+            <div class="field">
+              <label>Filter Lokasi</label>
+              <input id="filter_lokasi_barang" oninput="renderProductsTable()">
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn secondary" onclick="exportSemuaStokExcel()">Export Semua Stok Excel</button>
+            <button class="btn secondary" onclick="exportFilterStokExcel()">Export Stok Sesuai Filter Excel</button>
+            <button class="btn secondary" onclick="exportSemuaStokPDF()">Export Semua Stok PDF</button>
+            <button class="btn secondary" onclick="exportFilterStokPDF()">Export Stok Sesuai Filter PDF</button>
+          </div>
+
+          <div id="productsTableWrap"></div>
+        </div>
+      </div>
+
+      <div id="tab-masuk" class="tab-content hidden">
+        <div class="card">
+          <h2>Barang Masuk</h2>
+          <div class="grid">
+            <div class="field">
+              <label>Cari Barang</label>
+              <input id="search_masuk" placeholder="ketik nama barang..." oninput="isiDropdownBarangMasuk()">
+            </div>
+            <div class="field">
+              <label>Pilih Barang</label>
+              <select id="masuk_product"></select>
+            </div>
+            <div class="field">
+              <label>Jumlah Masuk</label>
+              <input id="masuk_jumlah" type="number">
+            </div>
+            <div class="field">
+              <label>Gudang</label>
+              <input id="masuk_gudang">
+            </div>
+            <div class="field">
+              <label>Lokasi / Rak</label>
+              <input id="masuk_lokasi">
+            </div>
+            <div class="field">
+              <label>Keterangan</label>
+              <input id="masuk_keterangan">
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn" onclick="simpanBarangMasuk()">Simpan Barang Masuk</button>
+            <button class="btn secondary" onclick="exportBarangMasukExcel()">Export Excel</button>
+            <button class="btn secondary" onclick="exportBarangMasukPDF()">Export PDF</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-keluar" class="tab-content hidden">
+        <div class="card">
+          <h2>Barang Keluar</h2>
+          <div class="grid">
+            <div class="field">
+              <label>Cari Barang</label>
+              <input id="search_keluar" placeholder="ketik nama barang..." oninput="isiDropdownBarangKeluar()">
+            </div>
+            <div class="field">
+              <label>Pilih Barang</label>
+              <select id="keluar_product"></select>
+            </div>
+            <div class="field">
+              <label>Jumlah Keluar</label>
+              <input id="keluar_jumlah" type="number">
+            </div>
+            <div class="field">
+              <label>Gudang</label>
+              <input id="keluar_gudang">
+            </div>
+            <div class="field">
+              <label>Lokasi / Rak</label>
+              <input id="keluar_lokasi">
+            </div>
+            <div class="field">
+              <label>Keterangan</label>
+              <input id="keluar_keterangan">
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn danger" onclick="simpanBarangKeluar()">Simpan Barang Keluar</button>
+            <button class="btn secondary" onclick="exportBarangKeluarExcel()">Export Excel</button>
+            <button class="btn secondary" onclick="exportBarangKeluarPDF()">Export PDF</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-kartu" class="tab-content hidden">
+        <div class="card">
+          <h2>Kartu Stok</h2>
+          <div class="grid-3">
+            <div class="field">
+              <label>Filter Nama Barang</label>
+              <input id="filter_kartu_nama" oninput="renderKartuStok()">
+            </div>
+            <div class="field">
+              <label>Filter Gudang</label>
+              <input id="filter_kartu_gudang" oninput="renderKartuStok()">
+            </div>
+            <div class="field">
+              <label>Filter Lokasi</label>
+              <input id="filter_kartu_lokasi" oninput="renderKartuStok()">
+            </div>
+          </div>
+          <div id="kartuStokWrap"></div>
+        </div>
+      </div>
+
+      <div id="tab-opname" class="tab-content hidden">
+        <div class="card">
+          <h2>Opname per Rak / Lokasi</h2>
+          <div class="grid">
+            <div class="field">
+              <label>Filter Gudang</label>
+              <input id="opname_filter_gudang">
+            </div>
+            <div class="field">
+              <label>Filter Lokasi / Rak</label>
+              <input id="opname_filter_lokasi">
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn secondary" onclick="siapkanOpname()">Tampilkan Barang Lokasi Ini</button>
+            <button class="btn secondary" onclick="exportOpnameExcel()">Export Excel</button>
+            <button class="btn secondary" onclick="exportOpnamePDF()">Export PDF</button>
+          </div>
+          <div id="opnameArea" class="result muted">Pilih gudang dan lokasi, lalu klik tombol di atas.</div>
+        </div>
+
+        <div class="card">
+          <h2>Riwayat Opname</h2>
+          <div id="riwayatOpnameWrap"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://dvpyetgzpkmfqbjboihz.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2cHlldGd6cGttZnFiamJvaWh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyNzk4MDEsImV4cCI6MjA5MDg1NTgwMX0.FNKl_4SjPrfyHHyN3RNoRXVKAL2_1VUCtRGMh7LjQwU';
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let productsData = [];
+    let transactionsData = [];
+    let opnamesData = [];
+    let currentUser = null;
+    let currentProfile = null;
+    let editingId = null;
+
+    function setDebug(text, isError = false) {
+      const el = document.getElementById('debug');
+      el.textContent = text;
+      el.className = 'result ' + (isError ? 'status-bad' : 'muted');
+    }
+
+    function showTab(tab) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.menu button').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + tab).classList.remove('hidden');
+      document.getElementById('tab-btn-' + tab).classList.add('active');
+    }
+
+    function isAdmin() {
+      return currentProfile?.role === 'admin';
+    }
+
+    function generateKodeBarang() {
+      const total = productsData.length + 1;
+      return 'ASH' + String(total).padStart(3, '0');
+    }
+
+    async function loginUser() {
+      const email = document.getElementById('login_email').value;
+      const password = document.getElementById('login_password').value;
+      const { error } = await client.auth.signInWithPassword({ email, password });
+      if (error) {
+        document.getElementById('loginInfo').textContent = 'Login gagal: ' + error.message;
+        return;
+      }
+      document.getElementById('loginInfo').textContent = 'Login berhasil';
+      await cekSession();
+    }
+
+    async function logoutUser() {
+      await client.auth.signOut();
+      currentUser = null;
+      currentProfile = null;
+      document.getElementById('appArea').classList.add('hidden');
+      document.getElementById('loginCard').classList.remove('hidden');
+      document.getElementById('login_password').value = '';
+    }
+
+    async function cekSession() {
+      const { data } = await client.auth.getUser();
+      currentUser = data?.user || null;
+      if (!currentUser) {
+        document.getElementById('appArea').classList.add('hidden');
+        document.getElementById('loginCard').classList.remove('hidden');
+        return;
+      }
+
+      const { data: profile, error } = await client
+        .from('profiles')
+        .select('*')
+        .eq('id', currentUser.id)
+        .single();
+
+      if (error) {
+        document.getElementById('loginInfo').textContent = 'Gagal baca profile: ' + error.message;
+        return;
+      }
+
+      currentProfile = profile;
+      document.getElementById('sessionNama').textContent = profile?.nama || currentUser.email;
+      document.getElementById('sessionRole').textContent = 'Role: ' + (profile?.role || '-');
+      document.getElementById('loginCard').classList.add('hidden');
+      document.getElementById('appArea').classList.remove('hidden');
+      applyRoleUI();
+      await loadSemua();
+    }
+
+    function applyRoleUI() {
+      const admin = isAdmin();
+      document.getElementById('barangFormWrap').classList.toggle('hidden', !admin);
+      document.getElementById('readonlyGudangMsg').classList.toggle('hidden', admin);
+    }
+
+    async function tesKoneksi() {
+      try {
+        const { error } = await client.from('products').select('id').limit(1);
+        if (error) setDebug('Koneksi gagal: ' + error.message, true);
+        else setDebug('Koneksi Supabase berhasil.');
+      } catch (e) {
+        setDebug('Error koneksi: ' + e.message, true);
+      }
+    }
+
+    async function loadSemua() {
+      await Promise.all([loadProducts(), loadTransactions(), loadOpnames()]);
+      renderDashboard();
+      setDebug('Semua data berhasil di-refresh.');
+    }
+async function loadProducts() {
+  const { data, error } = await client.from('products').select('*');
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  // NORMALISASI FIELD BIAR DASHBOARD BISA BACA
+  productsData = (data || []).map(item => ({
+    ...item,
+
+    // samakan nama field
+    nama: item.nama || item.nama_barang || '',
+    kode: item.kode || item.kode_barang || '',
+
+    // stok
+    stok: item.stok ?? item.stok_awal ?? 0
+  }));
+}
+    async function loadTransactions() {
+      const { data, error } = await client.from('stock_transactions').select('*').order('tanggal', { ascending: false });
+      if (error) return setDebug('Gagal load transaksi: ' + error.message, true);
+      transactionsData = data || [];
+      renderKartuStok();
+      renderProductsTable();
+    }
+
+    async function loadOpnames() {
+      const { data, error } = await client.from('stock_opnames').select('*').order('created_at', { ascending: false });
+      if (error) return setDebug('Gagal load opname: ' + error.message, true);
+      opnamesData = data || [];
+      await renderRiwayatOpname();
+    }
+
+    function hitungStokBarang(productId) {
+      const barang = productsData.find(x => x.id === productId);
+      const stokAwal = Number(barang?.stok_awal || 0);
+      let masuk = 0;
+      let keluar = 0;
+      transactionsData.forEach(trx => {
+        if (trx.product_id === productId) {
+          if (trx.jenis_transaksi === 'masuk') masuk += Number(trx.jumlah || 0);
+          if (trx.jenis_transaksi === 'keluar') keluar += Number(trx.jumlah || 0);
+        }
+      });
+      return stokAwal + masuk - keluar;
+    }
+
+    function statusStok(item) {
+      const stok = hitungStokBarang(item.id);
+      const min = Number(item.stok_minimum || 0);
+      if (stok <= 0) return { text: 'Wajib Order', cls: 'status-bad' };
+      if (min > 0 && stok <= min) return { text: 'Menipis', cls: 'status-warn' };
+      return { text: 'Aman', cls: 'status-ok' };
+    }
+
+    function renderDashboard() {
+      document.getElementById('dash_total_barang').textContent = productsData.length;
+      document.getElementById('dash_total_stok').textContent = productsData.reduce((a, b) => a + hitungStokBarang(b.id), 0);
+      document.getElementById('dash_stok_menipis').textContent = productsData.filter(x => statusStok(x).text === 'Menipis').length;
+      document.getElementById('dash_wajib_order').textContent = productsData.filter(x => statusStok(x).text === 'Wajib Order').length;
+
+      let notif = '<div class="card"><b>Notifikasi Stok</b>';
+      const list = productsData.filter(x => ['Menipis', 'Wajib Order'].includes(statusStok(x).text));
+      if (list.length === 0) {
+        notif += '<p class="status-ok">Tidak ada stok kritis.</p>';
+      } else {
+        notif += '<table><tr><th>Barang</th><th>Gudang</th><th>Lokasi</th><th>Stok</th><th>Minimum</th><th>Status</th></tr>';
+        list.forEach(item => {
+          const st = statusStok(item);
+          notif += `<tr>
+            <td>${item.nama_barang}</td>
+            <td>${item.gudang || ''}</td>
+            <td>${item.lokasi || ''}</td>
+            <td>${hitungStokBarang(item.id)}</td>
+            <td>${item.stok_minimum || 0}</td>
+            <td class="${st.cls}">${st.text}</td>
+          </tr>`;
+        });
+        notif += '</table>';
+      }
+      notif += '</div>';
+      document.getElementById('dashboardNotif').innerHTML = notif;
+    }
+
+    function isiDropdownBarangMasuk() {
+      const q = (document.getElementById('search_masuk').value || '').toLowerCase();
+      const select = document.getElementById('masuk_product');
+      select.innerHTML = '';
+      productsData
+        .filter(item => !q || (item.nama_barang || '').toLowerCase().includes(q) || (item.kode_barang || '').toLowerCase().includes(q))
+        .forEach(item => {
+          const opt = document.createElement('option');
+          opt.value = item.id;
+          opt.textContent = `${item.nama_barang} | ${item.gudang || '-'} | ${item.lokasi || '-'} | ${item.letak_barang || '-'}`;
+          select.appendChild(opt);
+        });
+    }
+
+    function isiDropdownBarangKeluar() {
+      const q = (document.getElementById('search_keluar').value || '').toLowerCase();
+      const select = document.getElementById('keluar_product');
+      select.innerHTML = '';
+      productsData
+        .filter(item => !q || (item.nama_barang || '').toLowerCase().includes(q) || (item.kode_barang || '').toLowerCase().includes(q))
+        .forEach(item => {
+          const opt = document.createElement('option');
+          opt.value = item.id;
+          opt.textContent = `${item.nama_barang} | ${item.gudang || '-'} | ${item.lokasi || '-'} | ${item.letak_barang || '-'}`;
+          select.appendChild(opt);
+        });
+    }
+
+    function getFilteredProducts() {
+      const cari = (document.getElementById('cari_barang').value || '').toLowerCase();
+      const lokasiFilter = (document.getElementById('filter_lokasi_barang').value || '').toLowerCase();
+
+      return productsData.filter(item => {
+        const cocokCari =
+          !cari ||
+          (item.nama_barang || '').toLowerCase().includes(cari) ||
+          (item.kode_barang || '').toLowerCase().includes(cari);
+        const cocokLokasi =
+          !lokasiFilter ||
+          (item.lokasi || '').toLowerCase().includes(lokasiFilter);
+        return cocokCari && cocokLokasi;
+      });
+    }
+
+    function renderProductsTable() {
+      const rows = getFilteredProducts();
+
+      let html = '<table><tr><th>Kode</th><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Letak</th><th>Stok Awal</th><th>Stok Minimum</th><th>Stok Saat Ini</th><th>Status Stok</th><th>Status Data</th>';
+      if (isAdmin()) html += '<th>Aksi</th>';
+      html += '</tr>';
+
+      rows.forEach(item => {
+        const st = statusStok(item);
+        html += `<tr>
+          <td>${item.kode_barang || ''}</td>
+          <td>${item.nama_barang || ''}</td>
+          <td>${item.gudang || ''}</td>
+          <td>${item.lokasi || ''}</td>
+          <td>${item.letak_barang || ''}</td>
+          <td>${item.stok_awal || 0}</td>
+          <td>${item.stok_minimum || 0}</td>
+          <td>${hitungStokBarang(item.id)}</td>
+          <td class="${st.cls}">${st.text}</td>
+          <td>${item.status || ''}</td>`;
+        if (isAdmin()) {
+          html += `<td>
+            <button class="btn warning" onclick="editBarang('${item.id}')">Edit</button>
+            <button class="btn danger" onclick="hapusBarang('${item.id}')">Hapus</button>
+          </td>`;
+        }
+        html += '</tr>';
+      });
+      html += '</table>';
+      document.getElementById('productsTableWrap').innerHTML = html;
+    }
+
+    function renderKartuStok() {
+      const fNama = (document.getElementById('filter_kartu_nama').value || '').toLowerCase();
+      const fGudang = (document.getElementById('filter_kartu_gudang').value || '').toLowerCase();
+      const fLokasi = (document.getElementById('filter_kartu_lokasi').value || '').toLowerCase();
+
+      const rows = transactionsData.filter(trx => {
+        const barang = productsData.find(x => x.id === trx.product_id);
+        const namaBarang = barang?.nama_barang || '';
+        const okNama = !fNama || namaBarang.toLowerCase().includes(fNama) || (barang?.kode_barang || '').toLowerCase().includes(fNama);
+        const okGudang = !fGudang || (trx.gudang || '').toLowerCase().includes(fGudang);
+        const okLokasi = !fLokasi || (trx.lokasi || '').toLowerCase().includes(fLokasi);
+        return okNama && okGudang && okLokasi;
+      });
+
+      let html = '<table><tr><th>Tanggal</th><th>Kode</th><th>Nama Barang</th><th>Masuk</th><th>Keluar</th><th>Saldo Akhir</th><th>Gudang</th><th>Lokasi</th><th>Keterangan</th></tr>';
+      rows.forEach(trx => {
+        const barang = productsData.find(x => x.id === trx.product_id);
+        const semuaBarang = transactionsData
+          .filter(x => x.product_id === trx.product_id)
+          .sort((a,b) => new Date(a.tanggal) - new Date(b.tanggal));
+
+        let saldo = Number(barang?.stok_awal || 0);
+        for (const row of semuaBarang) {
+          if (row.jenis_transaksi === 'masuk') saldo += Number(row.jumlah || 0);
+          if (row.jenis_transaksi === 'keluar') saldo -= Number(row.jumlah || 0);
+          if (row.id === trx.id) break;
+        }
+
+        html += `<tr>
+          <td>${trx.tanggal || ''}</td>
+          <td>${barang?.kode_barang || ''}</td>
+          <td>${barang?.nama_barang || '-'}</td>
+          <td>${trx.jenis_transaksi === 'masuk' ? trx.jumlah : ''}</td>
+          <td>${trx.jenis_transaksi === 'keluar' ? trx.jumlah : ''}</td>
+          <td>${saldo}</td>
+          <td>${trx.gudang || ''}</td>
+          <td>${trx.lokasi || ''}</td>
+          <td>${trx.keterangan || ''}</td>
+        </tr>`;
+      });
+      html += '</table>';
+      document.getElementById('kartuStokWrap').innerHTML = html;
+    }
+
+    function resetFormBarang() {
+      editingId = null;
+      document.getElementById('barang_kode').value = generateKodeBarang();
+      document.getElementById('barang_nama').value = '';
+      document.getElementById('barang_barcode').value = '';
+      document.getElementById('barang_gudang').value = '';
+      document.getElementById('barang_lokasi').value = '';
+      document.getElementById('barang_letak').value = '';
+      document.getElementById('barang_stok_awal').value = '';
+      document.getElementById('barang_stok_minimum').value = '';
+      document.getElementById('barang_status').value = 'aktif';
+      document.getElementById('btnUpdateBarang').classList.add('hidden');
+      document.getElementById('btnSimpanBarang').classList.remove('hidden');
+    }
+
+    async function simpanBarang() {
+      if (!isAdmin()) return setDebug('Hanya admin yang bisa tambah barang.', true);
+
+      const payload = {
+        kode_barang: document.getElementById('barang_kode').value,
+        nama_barang: document.getElementById('barang_nama').value,
+        barcode: document.getElementById('barang_barcode').value,
+        gudang: document.getElementById('barang_gudang').value,
+        lokasi: document.getElementById('barang_lokasi').value,
+        letak_barang: document.getElementById('barang_letak').value,
+        stok_awal: Number(document.getElementById('barang_stok_awal').value || 0),
+        stok_minimum: Number(document.getElementById('barang_stok_minimum').value || 0),
+        status: document.getElementById('barang_status').value
+      };
+
+      if (!payload.nama_barang) return setDebug('Nama barang wajib diisi.', true);
+
+      const { error } = await client.from('products').insert([payload]);
+      if (error) return setDebug('Gagal tambah barang: ' + error.message, true);
+
+      setDebug('Data barang berhasil disimpan.');
+      resetFormBarang();
+      await loadProducts();
+      await loadTransactions();
+      renderDashboard();
+    }
+
+    function editBarang(id) {
+      if (!isAdmin()) return;
+      const item = productsData.find(x => x.id === id);
+      if (!item) return;
+
+      editingId = id;
+      document.getElementById('barang_kode').value = item.kode_barang || '';
+      document.getElementById('barang_nama').value = item.nama_barang || '';
+      document.getElementById('barang_barcode').value = item.barcode || '';
+      document.getElementById('barang_gudang').value = item.gudang || '';
+      document.getElementById('barang_lokasi').value = item.lokasi || '';
+      document.getElementById('barang_letak').value = item.letak_barang || '';
+      document.getElementById('barang_stok_awal').value = item.stok_awal || 0;
+      document.getElementById('barang_stok_minimum').value = item.stok_minimum || 0;
+      document.getElementById('barang_status').value = item.status || 'aktif';
+      document.getElementById('btnUpdateBarang').classList.remove('hidden');
+      document.getElementById('btnSimpanBarang').classList.add('hidden');
+      showTab('barang');
+      setDebug('Mode edit aktif.');
+    }
+
+    async function updateBarang() {
+      if (!isAdmin()) return setDebug('Hanya admin yang bisa update barang.', true);
+      if (!editingId) return setDebug('Tidak ada data yang diedit.', true);
+
+      const payload = {
+        kode_barang: document.getElementById('barang_kode').value,
+        nama_barang: document.getElementById('barang_nama').value,
+        barcode: document.getElementById('barang_barcode').value,
+        gudang: document.getElementById('barang_gudang').value,
+        lokasi: document.getElementById('barang_lokasi').value,
+        letak_barang: document.getElementById('barang_letak').value,
+        stok_awal: Number(document.getElementById('barang_stok_awal').value || 0),
+        stok_minimum: Number(document.getElementById('barang_stok_minimum').value || 0),
+        status: document.getElementById('barang_status').value
+      };
+
+      const { error } = await client.from('products').update(payload).eq('id', editingId);
+      if (error) return setDebug('Gagal update barang: ' + error.message, true);
+
+      setDebug('Data barang berhasil diupdate.');
+      resetFormBarang();
+      await loadProducts();
+      await loadTransactions();
+      renderDashboard();
+    }
+
+    async function hapusBarang(id) {
+      if (!isAdmin()) return setDebug('Hanya admin yang bisa hapus barang.', true);
+      if (!confirm('Yakin hapus data barang ini?')) return;
+
+      const { error } = await client.from('products').delete().eq('id', id);
+      if (error) return setDebug('Gagal hapus barang: ' + error.message, true);
+
+      setDebug('Data barang berhasil dihapus.');
+      await loadProducts();
+      await loadTransactions();
+      renderDashboard();
+    }
+
+    async function simpanBarangMasuk() {
+      const payload = {
+        product_id: document.getElementById('masuk_product').value,
+        jenis_transaksi: 'masuk',
+        jumlah: Number(document.getElementById('masuk_jumlah').value || 0),
+        gudang: document.getElementById('masuk_gudang').value,
+        lokasi: document.getElementById('masuk_lokasi').value,
+        keterangan: document.getElementById('masuk_keterangan').value,
+        created_by: currentUser?.id || null
+      };
+
+      const barang = productsData.find(x => x.id === payload.product_id);
+      if (!barang) return setDebug('Barang belum dipilih.', true);
+      if (payload.jumlah <= 0) return setDebug('Jumlah masuk harus lebih dari 0.', true);
+      if (!payload.gudang) payload.gudang = barang.gudang || '';
+      if (!payload.lokasi) payload.lokasi = barang.lokasi || '';
+
+      const { error } = await client.from('stock_transactions').insert([payload]);
+      if (error) return setDebug('Gagal simpan barang masuk: ' + error.message, true);
+
+      setDebug('Barang masuk berhasil disimpan.');
+      document.getElementById('masuk_jumlah').value = '';
+      document.getElementById('masuk_gudang').value = '';
+      document.getElementById('masuk_lokasi').value = '';
+      document.getElementById('masuk_keterangan').value = '';
+      await loadTransactions();
+      renderProductsTable();
+      renderDashboard();
+    }
+
+    async function simpanBarangKeluar() {
+      const payload = {
+        product_id: document.getElementById('keluar_product').value,
+        jenis_transaksi: 'keluar',
+        jumlah: Number(document.getElementById('keluar_jumlah').value || 0),
+        gudang: document.getElementById('keluar_gudang').value,
+        lokasi: document.getElementById('keluar_lokasi').value,
+        keterangan: document.getElementById('keluar_keterangan').value,
+        created_by: currentUser?.id || null
+      };
+
+      const barang = productsData.find(x => x.id === payload.product_id);
+      if (!barang) return setDebug('Barang belum dipilih.', true);
+      if (payload.jumlah <= 0) return setDebug('Jumlah keluar harus lebih dari 0.', true);
+
+      const stokSaatIni = hitungStokBarang(payload.product_id);
+      if (payload.jumlah > stokSaatIni) return setDebug('Stok tidak cukup. Stok saat ini: ' + stokSaatIni, true);
+
+      if (!payload.gudang) payload.gudang = barang.gudang || '';
+      if (!payload.lokasi) payload.lokasi = barang.lokasi || '';
+
+      const { error } = await client.from('stock_transactions').insert([payload]);
+      if (error) return setDebug('Gagal simpan barang keluar: ' + error.message, true);
+
+      setDebug('Barang keluar berhasil disimpan.');
+      document.getElementById('keluar_jumlah').value = '';
+      document.getElementById('keluar_gudang').value = '';
+      document.getElementById('keluar_lokasi').value = '';
+      document.getElementById('keluar_keterangan').value = '';
+      await loadTransactions();
+      renderProductsTable();
+      renderDashboard();
+    }
+
+    function siapkanOpname() {
+      const gudang = (document.getElementById('opname_filter_gudang').value || '').toLowerCase();
+      const lokasi = (document.getElementById('opname_filter_lokasi').value || '').toLowerCase();
+
+      const rows = productsData.filter(item => {
+        const okGudang = !gudang || (item.gudang || '').toLowerCase().includes(gudang);
+        const okLokasi = !lokasi || (item.lokasi || '').toLowerCase().includes(lokasi);
+        return okGudang && okLokasi;
+      });
+
+      if (rows.length === 0) {
+        document.getElementById('opnameArea').innerHTML = '<span class="status-bad">Tidak ada barang di gudang/lokasi ini.</span>';
+        return;
+      }
+
+      let html = '<table><tr><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Letak</th><th>Stok Sistem</th><th>Stok Fisik</th><th>Keterangan</th><th>Foto Selfie</th><th>Aksi</th><th>Hasil</th></tr>';
+
+      rows.forEach(item => {
+        const stokSistem = hitungStokBarang(item.id);
+        html += `<tr>
+          <td>${item.nama_barang}</td>
+          <td>${item.gudang || ''}</td>
+          <td>${item.lokasi || ''}</td>
+          <td>${item.letak_barang || ''}</td>
+          <td>${stokSistem}</td>
+          <td><input type="number" id="fisik_${item.id}" placeholder="Isi stok fisik"></td>
+          <td><input type="text" id="ket_${item.id}" placeholder="Isi alasan / keterangan"></td>
+          <td><input type="file" id="foto_${item.id}" accept="image/*" capture="user"></td>
+          <td><button class="btn secondary" onclick="simpanOpnameItem('${item.id}')">Simpan Opname</button></td>
+          <td id="hasil_${item.id}"></td>
+        </tr>`;
+      });
+
+      html += '</table>';
+      document.getElementById('opnameArea').innerHTML = html;
+    }
+
+    async function simpanOpnameItem(productId) {
+      const barang = productsData.find(x => x.id === productId);
+      if (!barang) return setDebug('Barang tidak ditemukan.', true);
+
+      const stokSistem = hitungStokBarang(productId);
+      const stokFisik = Number(document.getElementById('fisik_' + productId).value || 0);
+      const selisih = stokFisik - stokSistem;
+      const status = selisih === 0 ? 'sesuai' : 'tidak sesuai';
+      const keteranganManual = document.getElementById('ket_' + productId).value || '';
+
+      const fileInput = document.getElementById('foto_' + productId);
+      const file = fileInput?.files?.[0];
+      if (!file) return setDebug('Foto selfie opname wajib diambil.', true);
+
+      const fileExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+      const fileName = `${productId}-${Date.now()}.${fileExt}`;
+      const filePath = `opname/${fileName}`;
+
+      const { error: uploadError } = await client.storage
+        .from('opname-foto')
+        .upload(filePath, file, { upsert: false });
+
+      if (uploadError) return setDebug('Gagal upload foto opname: ' + uploadError.message, true);
+
+      const payload = {
+        product_id: productId,
+        gudang: barang.gudang || '',
+        lokasi: barang.lokasi || '',
+        stok_sistem: stokSistem,
+        stok_fisik: stokFisik,
+        selisih: selisih,
+        status: status,
+        catatan: status === 'sesuai' ? 'Stok sesuai' : 'Stok tidak sesuai, periksa kembali opname Anda',
+        keterangan: keteranganManual,
+        foto_opname_url: filePath,
+        petugas_opname: currentProfile?.nama || currentUser?.email || ''
+      };
+
+      const { error } = await client.from('stock_opnames').insert([payload]);
+      if (error) return setDebug('Gagal simpan opname: ' + error.message, true);
+
+      const hasilEl = document.getElementById('hasil_' + productId);
+      hasilEl.innerHTML = status === 'sesuai'
+        ? '<span class="status-ok">Stok sesuai</span>'
+        : '<span class="status-bad">Stok tidak sesuai, periksa kembali opname Anda</span>';
+
+      setDebug('Opname berhasil disimpan.');
+      await loadOpnames();
+    }
+
+    async function lihatFotoOpname(filePath) {
+      if (!filePath) return setDebug('Foto opname tidak tersedia', true);
+
+      const { data, error } = await client.storage
+        .from('opname-foto')
+        .createSignedUrl(filePath, 60);
+
+      if (error) return setDebug('Gagal membuka foto: ' + error.message, true);
+
+      window.open(data.signedUrl, '_blank');
+    }
+
+    async function renderRiwayatOpname() {
+      let html = '<table><tr><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Stok Sistem</th><th>Stok Fisik</th><th>Selisih</th><th>Status</th><th>Keterangan</th><th>Petugas</th>';
+      if (isAdmin()) html += '<th>Foto Opname</th>';
+      html += '</tr>';
+
+      opnamesData.forEach(op => {
+        const barang = productsData.find(x => x.id === op.product_id);
+        html += `<tr>
+          <td>${barang?.nama_barang || ''}</td>
+          <td>${op.gudang || ''}</td>
+          <td>${op.lokasi || ''}</td>
+          <td>${op.stok_sistem || 0}</td>
+          <td>${op.stok_fisik || 0}</td>
+          <td>${op.selisih || 0}</td>
+          <td class="${op.status === 'sesuai' ? 'status-ok' : 'status-bad'}">${op.status || ''}</td>
+          <td>${op.keterangan || ''}</td>
+          <td>${op.petugas_opname || ''}</td>`;
+
+        if (isAdmin()) {
+          html += `<td><button class="btn secondary" onclick="lihatFotoOpname('${op.foto_opname_url || ''}')">Lihat Foto</button></td>`;
+        }
+
+        html += '</tr>';
+      });
+
+      html += '</table>';
+      document.getElementById('riwayatOpnameWrap').innerHTML = html;
+    }
+
+
+  const file = document.getElementById('import_barang_file').files[0];
+  if (!file) return alert('Pilih file CSV dulu');
+
+  const text = await file.text();
+  const lines = text.split(/\r?\n/).filter(x => x.trim());
+
+  if (lines.length < 2) {
+    alert('CSV kosong / tidak valid');
+    return;
+  }
+
+  const delimiter = lines[0].includes(';') ? ';' : ',';
+
+  const headers = lines[0].toLowerCase().split(delimiter).map(x => x.trim());
+
+  function ambil(cols, nama) {
+    const i = headers.indexOf(nama);
+    return i !== -1 ? cols[i] : '';
+  }
+
+  const dataInsert = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(delimiter);
+
+    const kode_barang = ambil(cols, 'kode_barang') || ambil(cols, 'kode');
+    const nama_barang = ambil(cols, 'nama_barang') || ambil(cols, 'nama');
+
+    if (!kode_barang || !nama_barang) continue;
+
+    dataInsert.push({
+      kode_barang: kode_barang.trim(),
+      nama_barang: nama_barang.trim(),
+      barcode: ambil(cols, 'barcode'),
+      gudang: ambil(cols, 'gudang'),
+      lokasi: ambil(cols, 'lokasi'),
+      letak_barang: ambil(cols, 'letak') || ambil(cols, 'letak_barang'),
+      stok_awal: Number(ambil(cols, 'stok') || ambil(cols, 'stok_awal') || 0),
+      stok_minimum: Number(ambil(cols, 'stok_minimum') || 0),
+      status: ambil(cols, 'status') || 'aktif'
+    });
+  }
+
+  if (!dataInsert.length) {
+    alert('Tidak ada data valid');
+    return;
+  }
+
+  const { error } = await client.from('products').insert(dataInsert);
+
+  if (error) {
+    alert('Gagal import: ' + error.message);
+    return;
+  }
+
+  alert('Import berhasil: ' + dataInsert.length + ' data');
+
+  // reload data
+  await loadProducts();
+  renderProductsTable();
+}
+
+    const delimiter = lines[0].includes(';') ? ';' : ',';
+
+    function parseCSVLine(line, delimiter = ',') {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        const next = line[i + 1];
+
+        if (char === '"') {
+          if (inQuotes && next === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === delimiter && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+
+      result.push(current.trim());
+      return result.map(v => v.replace(/^"|"$/g, '').trim());
+    }
+
+    function normalizeHeader(header) {
+      return (header || '')
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '_');
+    }
+
+    const headers = parseCSVLine(lines[0], delimiter).map(normalizeHeader);
+
+    function getCol(cols, possibleNames) {
+      for (const name of possibleNames) {
+        const idx = headers.indexOf(name);
+        if (idx !== -1) return cols[idx] ?? '';
+      }
+      return '';
+    }
+
+    const rows = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseCSVLine(lines[i], delimiter);
+
+      const kode = getCol(cols, ['kode', 'kode_barang', 'item_code', 'sku']);
+      const nama_barang = getCol(cols, ['nama_barang', 'nama', 'nama_item', 'item_name']);
+      const barcode = getCol(cols, ['barcode', 'kode_barcode']);
+      const stok_awal = Number(getCol(cols, ['stok_awal', 'stok']) || 0);
+      const gudang = getCol(cols, ['gudang', 'warehouse']);
+      const lokasi = getCol(cols, ['lokasi', 'location']);
+      const letak = getCol(cols, ['letak', 'letak_barang', 'rak', 'posisi']);
+      const stok_minimum = Number(getCol(cols, ['stok_minimum', 'minimum_stok', 'min_stok']) || 0);
+      const status_data = getCol(cols, ['status_data', 'status']) || 'aktif';
+
+      if (!kode && !nama_barang) continue;
+
+      rows.push({
+        id: crypto.randomUUID(),
+        kode: kode,
+        nama_barang: nama_barang,
+        barcode: barcode,
+        gudang: gudang,
+        lokasi: lokasi,
+        letak: letak,
+        stok_awal: stok_awal,
+        stok_minimum: stok_minimum,
+        stok_saat_ini: stok_awal,
+        status_data: status_data
+      });
+    }
+
+    if (!rows.length) {
+      setDebug('Tidak ada data yang berhasil dibaca dari CSV.', true);
+      return;
+    }
+
+    let barangLama = JSON.parse(localStorage.getItem('data_barang') || '[]');
+
+    rows.forEach(newItem => {
+      const index = barangLama.findIndex(x => String(x.kode).trim() === String(newItem.kode).trim());
+      if (index >= 0) {
+        barangLama[index] = {
+          ...barangLama[index],
+          ...newItem
+        };
+      } else {
+        barangLama.push(newItem);
+      }
+    });
+
+  
+    function downloadCSV(filename, rows) {
+      const csvContent = rows.map(row =>
+        row.map(value => {
+          const text = String(value ?? '').replace(/"/g, '""');
+          return `"${text}"`;
+        }).join(',')
+      ).join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function openPrintWindow(title, htmlContent) {
+      const win = window.open('', '', 'width=1200,height=800');
+      win.document.write(`
+        <html>
+          <head>
+            <title>${title}</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 20px; }
+              table { width: 100%; border-collapse: collapse; }
+              th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 12px; }
+              th { background: #f3f4f6; }
+              h2 { margin-bottom: 16px; }
+            </style>
+          </head>
+          <body>
+            <h2>${title}</h2>
+            ${htmlContent}
+          </body>
+        </html>
+      `);
+      win.document.close();
+      win.print();
+    }
+
+
+    function buildStokRows(data) {
+      const rows = [[
+        'Kode Barang',
+        'Nama Barang',
+        'Gudang',
+        'Lokasi',
+        'Letak Barang',
+        'Stok Awal',
+        'Stok Minimum',
+        'Stok Saat Ini',
+        'Status Stok',
+        'Status Data'
+      ]];
+
+      data.forEach(item => {
+        const st = statusStok(item);
+        rows.push([
+          item.kode_barang || '',
+          item.nama_barang || '',
+          item.gudang || '',
+          item.lokasi || '',
+          item.letak_barang || '',
+          item.stok_awal || 0,
+          item.stok_minimum || 0,
+          hitungStokBarang(item.id),
+          st.text,
+          item.status || ''
+        ]);
+      });
+
+      return rows;
+    }
+
+    function renderStokTableForPrint(data) {
+      let html = `
+        <table>
+          <tr>
+            <th>Kode Barang</th>
+            <th>Nama Barang</th>
+            <th>Gudang</th>
+            <th>Lokasi</th>
+            <th>Letak Barang</th>
+            <th>Stok Awal</th>
+            <th>Stok Minimum</th>
+            <th>Stok Saat Ini</th>
+            <th>Status Stok</th>
+            <th>Status Data</th>
+          </tr>
+      `;
+
+      data.forEach(item => {
+        const st = statusStok(item);
+        html += `
+          <tr>
+            <td>${item.kode_barang || ''}</td>
+            <td>${item.nama_barang || ''}</td>
+            <td>${item.gudang || ''}</td>
+            <td>${item.lokasi || ''}</td>
+            <td>${item.letak_barang || ''}</td>
+            <td>${item.stok_awal || 0}</td>
+            <td>${item.stok_minimum || 0}</td>
+            <td>${hitungStokBarang(item.id)}</td>
+            <td>${st.text}</td>
+            <td>${item.status || ''}</td>
+          </tr>
+        `;
+      });
+
+      html += `</table>`;
+      return html;
+    }
+
+    function exportSemuaStokExcel() {
+      const rows = buildStokRows(productsData);
+      downloadCSV('semua-stok-barang.csv', rows);
+      setDebug('Export semua stok barang ke Excel berhasil');
+    }
+
+    function exportFilterStokExcel() {
+      const filtered = getFilteredProducts();
+      const rows = buildStokRows(filtered);
+      downloadCSV('stok-barang-filter.csv', rows);
+      setDebug('Export stok barang sesuai filter ke Excel berhasil');
+    }
+
+    function exportSemuaStokPDF() {
+      const html = renderStokTableForPrint(productsData);
+      openPrintWindow('Semua Stok Barang', html);
+      setDebug('Export semua stok barang ke PDF berhasil');
+    }
+
+    function exportFilterStokPDF() {
+      const filtered = getFilteredProducts();
+      const html = renderStokTableForPrint(filtered);
+      openPrintWindow('Stok Barang Sesuai Filter', html);
+      setDebug('Export stok barang sesuai filter ke PDF berhasil');
+    }
+
+    function exportBarangMasukExcel() {
+      const rows = [['Tanggal','Kode Barang','Nama Barang','Jumlah','Gudang','Lokasi','Keterangan']];
+      transactionsData
+        .filter(trx => trx.jenis_transaksi === 'masuk')
+        .forEach(trx => {
+          const barang = productsData.find(x => x.id === trx.product_id);
+          rows.push([
+            trx.tanggal || '',
+            barang?.kode_barang || '',
+            barang?.nama_barang || '',
+            trx.jumlah || 0,
+            trx.gudang || '',
+            trx.lokasi || '',
+            trx.keterangan || ''
+          ]);
+        });
+      downloadCSV('barang-masuk.csv', rows);
+      setDebug('Export Excel barang masuk berhasil');
+    }
+
+    function exportBarangKeluarExcel() {
+      const rows = [['Tanggal','Kode Barang','Nama Barang','Jumlah','Gudang','Lokasi','Keterangan']];
+      transactionsData
+        .filter(trx => trx.jenis_transaksi === 'keluar')
+        .forEach(trx => {
+          const barang = productsData.find(x => x.id === trx.product_id);
+          rows.push([
+            trx.tanggal || '',
+            barang?.kode_barang || '',
+            barang?.nama_barang || '',
+            trx.jumlah || 0,
+            trx.gudang || '',
+            trx.lokasi || '',
+            trx.keterangan || ''
+          ]);
+        });
+      downloadCSV('barang-keluar.csv', rows);
+      setDebug('Export Excel barang keluar berhasil');
+    }
+
+    function exportOpnameExcel() {
+      const rows = [['Nama Barang','Gudang','Lokasi','Stok Sistem','Stok Fisik','Selisih','Status','Keterangan','Petugas']];
+      opnamesData.forEach(op => {
+        const barang = productsData.find(x => x.id === op.product_id);
+        rows.push([
+          barang?.nama_barang || '',
+          op.gudang || '',
+          op.lokasi || '',
+          op.stok_sistem || 0,
+          op.stok_fisik || 0,
+          op.selisih || 0,
+          op.status || '',
+          op.keterangan || '',
+          op.petugas_opname || ''
+        ]);
+      });
+      downloadCSV('opname.csv', rows);
+      setDebug('Export Excel opname berhasil');
+    }
+
+    function exportBarangMasukPDF() {
+      const rows = transactionsData.filter(trx => trx.jenis_transaksi === 'masuk');
+      let html = '<table><tr><th>Tanggal</th><th>Kode</th><th>Nama Barang</th><th>Jumlah</th><th>Gudang</th><th>Lokasi</th><th>Keterangan</th></tr>';
+      rows.forEach(trx => {
+        const barang = productsData.find(x => x.id === trx.product_id);
+        html += `<tr>
+          <td>${trx.tanggal || ''}</td>
+          <td>${barang?.kode_barang || ''}</td>
+          <td>${barang?.nama_barang || ''}</td>
+          <td>${trx.jumlah || 0}</td>
+          <td>${trx.gudang || ''}</td>
+          <td>${trx.lokasi || ''}</td>
+          <td>${trx.keterangan || ''}</td>
+        </tr>`;
+      });
+      html += '</table>';
+      openPrintWindow('Barang Masuk', html);
+    }
+
+    function exportBarangKeluarPDF() {
+      const rows = transactionsData.filter(trx => trx.jenis_transaksi === 'keluar');
+      let html = '<table><tr><th>Tanggal</th><th>Kode</th><th>Nama Barang</th><th>Jumlah</th><th>Gudang</th><th>Lokasi</th><th>Keterangan</th></tr>';
+      rows.forEach(trx => {
+        const barang = productsData.find(x => x.id === trx.product_id);
+        html += `<tr>
+          <td>${trx.tanggal || ''}</td>
+          <td>${barang?.kode_barang || ''}</td>
+          <td>${barang?.nama_barang || ''}</td>
+          <td>${trx.jumlah || 0}</td>
+          <td>${trx.gudang || ''}</td>
+          <td>${trx.lokasi || ''}</td>
+          <td>${trx.keterangan || ''}</td>
+        </tr>`;
+      });
+      html += '</table>';
+      openPrintWindow('Barang Keluar', html);
+    }
+
+function exportOpnamePDF() {
+  let html = '<table><tr><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Stok Sistem</th><th>Stok Fisik</th><th>Selisih</th><th>Status</th><th>Keterangan</th><th>Petugas</th></tr>';
+  opnamesData.forEach(op => {
+    const barang = productsData.find(x => x.id === op.product_id);
+    html += `<tr>
+      <td>${barang?.nama_barang || ''}</td>
+      <td>${op.gudang || ''}</td>
+      <td>${op.lokasi || ''}</td>
+      <td>${op.stok_sistem || 0}</td>
+      <td>${op.stok_fisik || 0}</td>
+      <td>${op.selisih || 0}</td>
+      <td>${op.status || ''}</td>
+      <td>${op.keterangan || ''}</td>
+      <td>${op.petugas_opname || ''}</td>
+    </tr>`;
+  });
+  html += '</table>';
+  openPrintWindow('Opname', html);
+}
+
+async function importBarangCSV() {
+  try {
+    if (!isAdmin()) {
+      alert('Hanya admin yang bisa import');
+      return;
+    }
+
+    const file = document.getElementById('import_barang_file').files[0];
+    if (!file) {
+      alert('Pilih file CSV dulu');
+      return;
+    }
+
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).filter(x => x.trim());
+
+    if (!lines.length || lines.length < 2) {
+      alert('CSV kosong / tidak valid');
+      return;
+    }
+
+    const delimiter = lines[0].includes(';') ? ';' : ',';
+    const headers = lines[0].toLowerCase().split(delimiter).map(x => x.trim());
+
+    function ambil(cols, nama) {
+      const i = headers.indexOf(nama);
+      return i !== -1 ? cols[i] : '';
+    }
+
+    const dataInsert = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(delimiter);
+
+      const kode_barang = ambil(cols, 'kode_barang') || ambil(cols, 'kode');
+      const nama_barang = ambil(cols, 'nama_barang') || ambil(cols, 'nama');
+
+      if (!kode_barang || !nama_barang) continue;
+
+      dataInsert.push({
+        kode_barang: kode_barang.trim(),
+        nama_barang: nama_barang.trim(),
+        barcode: ambil(cols, 'barcode'),
+        gudang: ambil(cols, 'gudang'),
+        lokasi: ambil(cols, 'lokasi'),
+        letak_barang: ambil(cols, 'letak') || ambil(cols, 'letak_barang'),
+        stok_awal: Number(ambil(cols, 'stok') || ambil(cols, 'stok_awal') || 0),
+        stok_minimum: Number(ambil(cols, 'stok_minimum') || 0),
+        status: ambil(cols, 'status') || 'aktif'
+      });
+    }
+
+    if (!dataInsert.length) {
+      alert('Tidak ada data valid');
+      return;
+    }
+
+    const { error } = await client.from('products').insert(dataInsert);
+
+    if (error) {
+      alert('Gagal import: ' + error.message);
+      return;
+    }
+
+    alert('Import berhasil: ' + dataInsert.length + ' data');
+
+    await loadProducts();
+    await loadTransactions();
+    renderDashboard();
+    renderProductsTable();
+  } catch (err) {
+    console.error(err);
+    alert('Error import: ' + err.message);
+  }
+}
+
+    const file = document.getElementById('import_barang_file').files[0];
+    if (!file) {
+      alert('Pilih file CSV dulu');
+      return;
+    }
+
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).filter(x => x.trim());
+
+    if (lines.length < 2) {
+      alert('CSV kosong / tidak valid');
+      return;
+    }
+
+    const delimiter = lines[0].includes(';') ? ';' : ',';
+    const headers = lines[0].toLowerCase().split(delimiter).map(x => x.trim());
+
+    function ambil(cols, nama) {
+      const i = headers.indexOf(nama);
+      return i !== -1 ? cols[i] : '';
+    }
+
+    const dataInsert = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(delimiter);
+
+      const kode_barang = ambil(cols, 'kode_barang') || ambil(cols, 'kode');
+      const nama_barang = ambil(cols, 'nama_barang') || ambil(cols, 'nama');
+
+      if (!kode_barang || !nama_barang) continue;
+
+      dataInsert.push({
+        kode_barang: kode_barang.trim(),
+        nama_barang: nama_barang.trim(),
+        barcode: ambil(cols, 'barcode'),
+        gudang: ambil(cols, 'gudang'),
+        lokasi: ambil(cols, 'lokasi'),
+        letak_barang: ambil(cols, 'letak') || ambil(cols, 'letak_barang'),
+        stok_awal: Number(ambil(cols, 'stok') || ambil(cols, 'stok_awal') || 0),
+        stok_minimum: Number(ambil(cols, 'stok_minimum') || 0),
+        status: ambil(cols, 'status') || 'aktif'
+      });
+    }
+
+    if (!dataInsert.length) {
+      alert('Tidak ada data valid');
+      return;
+    }
+
+    const { error } = await client.from('products').insert(dataInsert);
+
+    if (error) {
+      alert('Gagal import: ' + error.message);
+      return;
+    }
+
+    alert('Import berhasil: ' + dataInsert.length + ' data');
+
+    await loadProducts();
+    await loadTransactions();
+    renderDashboard();
+    renderProductsTable();
+  } catch (err) {
+    console.error(err);
+    alert('Error import: ' + err.message);
+  }
+}
+
+
+  window.addEventListener('load', cekSession);
+</script>
+</body>
+</html>
