@@ -1060,49 +1060,37 @@ async function importBarangCSV() {
     }
 
     const text = await file.text();
-    const lines = text.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    const lines = text.split(/\r?\n/).filter(x => x.trim());
 
     if (lines.length < 2) {
-      alert('CSV kosong / tidak valid');
+      alert('CSV kosong');
       return;
     }
 
     const delimiter = lines[0].includes(';') ? ';' : ',';
-    const headers = lines[0].split(delimiter).map(h => h.trim().toLowerCase());
-
-    function ambil(cols, ...namaKolom) {
-      for (const nama of namaKolom) {
-        const idx = headers.indexOf(nama.toLowerCase());
-        if (idx !== -1) return (cols[idx] || '').replace(/^"|"$/g, '').trim();
-      }
-      return '';
-    }
 
     const dataInsert = [];
 
     for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(delimiter).map(x => x.trim());
+      const cols = lines[i].split(delimiter);
 
-      const kode_barang = ambil(cols, 'kode_barang', 'kode');
-      const nama_barang = ambil(cols, 'nama_barang', 'nama');
-
-      if (!kode_barang || !nama_barang) continue;
+      if (!cols[0] || !cols[1]) continue;
 
       dataInsert.push({
-        kode_barang,
-        nama_barang,
-        barcode: ambil(cols, 'barcode'),
-        stok_awal: Number(ambil(cols, 'stok_awal', 'stok') || 0),
-        gudang: ambil(cols, 'gudang'),
-        lokasi: ambil(cols, 'lokasi'),
-        letak_barang: ambil(cols, 'letak_barang', 'letak'),
-        stok_minimum: Number(ambil(cols, 'stok_minimum') || 0),
-        status: ambil(cols, 'status') || 'aktif'
+        kode_barang: cols[0],
+        nama_barang: cols[1],
+        barcode: cols[2] || '',
+        stok_awal: Number(cols[3] || 0),
+        gudang: cols[4] || '',
+        lokasi: cols[5] || '',
+        letak_barang: cols[6] || '',
+        stok_minimum: Number(cols[7] || 0),
+        status: 'aktif'
       });
     }
 
     if (!dataInsert.length) {
-      alert('Tidak ada data valid. Pastikan header CSV ada kode/nama barang.');
+      alert('Tidak ada data valid');
       return;
     }
 
@@ -1113,16 +1101,11 @@ async function importBarangCSV() {
       return;
     }
 
-    alert('Import berhasil: ' + dataInsert.length + ' data');
+    alert('Import berhasil');
 
-    fileInput.value = '';
-    await loadProducts();
-    await loadTransactions();
-    renderDashboard();
-    renderProductsTable();
   } catch (err) {
     console.error(err);
-    alert('Error import: ' + err.message);
+    alert('Error: ' + err.message);
   }
 }
 window.addEventListener('load', cekSession);
