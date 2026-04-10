@@ -1459,6 +1459,75 @@ async function importBarangCSV() {
     const text = await file.text();
     const lines = text.split(/\r?\n/).filter(x => x.trim());
 
+    if (!lines.length || lines.length < 2) {
+      alert('CSV kosong / tidak valid');
+      return;
+    }
+
+    const delimiter = lines[0].includes(';') ? ';' : ',';
+    const headers = lines[0].toLowerCase().split(delimiter).map(x => x.trim());
+
+    function ambil(cols, nama) {
+      const i = headers.indexOf(nama);
+      return i !== -1 ? cols[i] : '';
+    }
+
+    const dataInsert = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(delimiter);
+
+      const kode_barang = ambil(cols, 'kode_barang') || ambil(cols, 'kode');
+      const nama_barang = ambil(cols, 'nama_barang') || ambil(cols, 'nama');
+
+      if (!kode_barang || !nama_barang) continue;
+
+      dataInsert.push({
+        kode_barang: kode_barang.trim(),
+        nama_barang: nama_barang.trim(),
+        barcode: ambil(cols, 'barcode'),
+        gudang: ambil(cols, 'gudang'),
+        lokasi: ambil(cols, 'lokasi'),
+        letak_barang: ambil(cols, 'letak') || ambil(cols, 'letak_barang'),
+        stok_awal: Number(ambil(cols, 'stok') || ambil(cols, 'stok_awal') || 0),
+        stok_minimum: Number(ambil(cols, 'stok_minimum') || 0),
+        status: ambil(cols, 'status') || 'aktif'
+      });
+    }
+
+    if (!dataInsert.length) {
+      alert('Tidak ada data valid');
+      return;
+    }
+
+    const { error } = await client.from('products').insert(dataInsert);
+
+    if (error) {
+      alert('Gagal import: ' + error.message);
+      return;
+    }
+
+    alert('Import berhasil: ' + dataInsert.length + ' data');
+
+    await loadProducts();
+    await loadTransactions();
+    renderDashboard();
+    renderProductsTable();
+  } catch (err) {
+    console.error(err);
+    alert('Error import: ' + err.message);
+  }
+}
+
+    const file = document.getElementById('import_barang_file').files[0];
+    if (!file) {
+      alert('Pilih file CSV dulu');
+      return;
+    }
+
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).filter(x => x.trim());
+
     if (lines.length < 2) {
       alert('CSV kosong / tidak valid');
       return;
