@@ -1022,10 +1022,13 @@ async function loadProducts() {
     }
 
  async function importBarangCSV() {
-  if (!isAdmin()) return setDebug('Hanya admin yang bisa import data barang.', true);
+  if (!isAdmin()) {
+    setDebug('Hanya admin yang bisa import data barang.', true);
+    return;
+  }
 
   const fileInput = document.getElementById('import_barang_file');
-  const file = fileInput.files[0];
+  const file = fileInput?.files?.[0];
 
   if (!file) {
     setDebug('Pilih file CSV dulu.', true);
@@ -1034,8 +1037,11 @@ async function loadProducts() {
 
   try {
     const text = await file.text();
-    const cleanText = text.replace(/^\uFEFF/, '').replace(/\r/g, '');
-    const lines = cleanText.split('\n').map(x => x.trim()).filter(x => x);
+
+    const lines = text
+      .split(/\r?\n/)
+      .map(x => x.trim())
+      .filter(x => x);
 
     if (lines.length < 2) {
       setDebug('File CSV kosong atau tidak valid.', true);
@@ -1044,7 +1050,7 @@ async function loadProducts() {
 
     const delimiter = lines[0].includes(';') ? ';' : ',';
 
-    function parseCSVLine(line, delimiterChar) {
+    function parseCSVLine(line, delimiter = ',') {
       const result = [];
       let current = '';
       let inQuotes = false;
@@ -1060,7 +1066,7 @@ async function loadProducts() {
           } else {
             inQuotes = !inQuotes;
           }
-        } else if (char === delimiterChar && !inQuotes) {
+        } else if (char === delimiter && !inQuotes) {
           result.push(current.trim());
           current = '';
         } else {
@@ -1069,7 +1075,24 @@ async function loadProducts() {
       }
 
       result.push(current.trim());
-      return result.map(x => x.replace(/^"|"$/g, '').trim());
+      return result.map(v => v.replace(/^"|"$/g, '').trim());
+    }
+
+    function normalizeHeader(header) {
+      return (header || '')
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '_');
+    }
+
+    const headers = parseCSVLine(lines[0], delimiter).map(normalizeHeader);
+
+    function getCol(cols, possibleNames) {
+      for (const name of possibleNames) {
+        const idx = headers.indexOf(name);
+        if (idx !== -1) return cols[idx] ?? '';
+      }
+      return '';
     }
 
     const rows = [];
@@ -1077,58 +1100,64 @@ async function loadProducts() {
     for (let i = 1; i < lines.length; i++) {
       const cols = parseCSVLine(lines[i], delimiter);
 
-      const kode = cols[0] || ('ASH' + String(productsData.length + i).padStart(3, '0'));
-      const nama = cols[1] || '';
+      const kode = getCol(cols, ['kode', 'kode_barang', 'item_code', 'sku']);
+      const nama_barang = getCol(cols, ['nama_barang', 'nama', 'nama_item', 'item_name']);
+      const barcode = getCol(cols, ['barcode', 'kode_barcode']);
+      const stok_awal = Number(getCol(cols, ['stok_awal', 'stok']) || 0);
+      const gudang = getCol(cols, ['gudang', 'warehouse']);
+      const lokasi = getCol(cols, ['lokasi', 'location']);
+      const letak = getCol(cols, ['letak', 'letak_barang', 'rak', 'posisi']);
+      const stok_minimum = Number(getCol(cols, ['stok_minimum', 'minimum_stok', 'min_stok']) || 0);
+      const status_data = getCol(cols, ['status_data', 'status']) || 'aktif';
 
-      const stok = Number(String(cols[3] || 0).replace(/[^\d.-]/g, '')) || 0;
+      if (!kode && !nama_barang) continue;
 
       rows.push({
+        id: crypto.randomUUID(),
         kode: kode,
-        kode_barang: kode,
-
-        nama: nama,
-        nama_barang: nama,
-
-        barcode: cols[2] || '',
-
-        stok_awal: stok,
-        stok: stok,
-
-        gudang: cols[4] || '',
-        lokasi: cols[5] || '',
-        letak_barang: cols[6] || '',
-
-        status: cols[7] || 'aktif',
-        stok_minimum: Number(String(cols[8] || 0).replace(/[^\d.-]/g, '')) || 0
+        nama_barang: nama_barang,
+        barcode: barcode,
+        gudang: gudang,
+        lokasi: lokasi,
+        letak: letak,
+        stok_awal: stok_awal,
+        stok_minimum: stok_minimum,
+        stok_saat_ini: stok_awal,
+        status_data: status_data
       });
     }
 
-    const validRows = rows.filter(r =>
-      r.nama || r.nama_barang || r.kode || r.kode_barang || r.barcode
-    );
-
-    if (validRows.length === 0) {
-      setDebug('Tidak ada data barang valid untuk diimport.', true);
+    if (!rows.length) {
+      setDebug('Tidak ada data yang berhasil dibaca dari CSV.', true);
       return;
     }
 
-    const { error } = await client.from('products').insert(validRows);
+    let barangLama = JSON.parse(localStorage.getItem('data_barang') || '[]');
 
-    if (error) {
-      setDebug('Gagal import barang: ' + error.message, true);
-      return;
-    }
+    rows.forEach(newItem => {
+      const index = barangLama.findIndex(x => String(x.kode).trim() === String(newItem.kode).trim());
+      if (index >= 0) {
+        barangLama[index] = {
+          ...barangLama[index],
+          ...newItem
+        };
+      } else {
+        barangLama.push(newItem);
+      }
+    });
 
-    setDebug('Import data barang berhasil: ' + validRows.length + ' item');
+    localStorage.setItem('data_barang', JSON.stringify(barangLama));
+
+    if (typeof loadDataBarang === 'function') loadDataBarang();
+    if (typeof renderTableBarang === 'function') renderTableBarang();
+    if (typeof tampilkanDataBarang === 'function') tampilkanDataBarang();
 
     fileInput.value = '';
-    await loadProducts();
-    await loadTransactions();
-    renderDashboard();
+    setDebug(`Import berhasil. ${rows.length} data diproses.`, false);
 
   } catch (err) {
     console.error(err);
-    setDebug('Gagal import CSV: ' + (err.message || err), true);
+    setDebug('Terjadi error saat import CSV: ' + err.message, true);
   }
 }
     function downloadCSV(filename, rows) {
