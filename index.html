@@ -1052,7 +1052,7 @@ async function importBarangCSV() {
     }
 
     const fileInput = document.getElementById('import_barang_file');
-    const file = fileInput?.files?.[0];
+    const file = fileInput && fileInput.files ? fileInput.files[0] : null;
 
     if (!file) {
       alert('Pilih file CSV dulu');
@@ -1060,19 +1060,18 @@ async function importBarangCSV() {
     }
 
     const text = await file.text();
-    const lines = text.split(/\r?\n/).filter(x => x.trim());
+    const lines = text.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
 
     if (lines.length < 2) {
-      alert('CSV kosong');
+      alert('CSV kosong / tidak valid');
       return;
     }
 
     const delimiter = lines[0].includes(';') ? ';' : ',';
-
     const dataInsert = [];
 
     for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(delimiter);
+      const cols = lines[i].split(delimiter).map(x => x.replace(/^"|"$/g, '').trim());
 
       if (!cols[0] || !cols[1]) continue;
 
@@ -1085,7 +1084,7 @@ async function importBarangCSV() {
         lokasi: cols[5] || '',
         letak_barang: cols[6] || '',
         stok_minimum: Number(cols[7] || 0),
-        status: 'aktif'
+        status: cols[8] || 'aktif'
       });
     }
 
@@ -1101,12 +1100,17 @@ async function importBarangCSV() {
       return;
     }
 
-    alert('Import berhasil');
-
+    alert('Import berhasil: ' + dataInsert.length + ' data');
+    fileInput.value = '';
+    await loadProducts();
+    await loadTransactions();
+    renderDashboard();
+    renderProductsTable();
   } catch (err) {
     console.error(err);
-    alert('Error: ' + err.message);
+    alert('Error import: ' + err.message);
   }
+}
 }
 window.addEventListener('load', cekSession);
 </script>
