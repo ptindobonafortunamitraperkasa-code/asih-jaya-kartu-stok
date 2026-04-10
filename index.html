@@ -1588,45 +1588,153 @@ async function importBarangCSV() {
   }
 }
 
-window.addEventListener('load', cekSession);
-    // ================= FIX GLOBAL ERROR =================
+<script>
+ 
+    try {
+      const file = document.getElementById('import_barang_file').files[0];
+      if (!file) {
+        alert('Pilih file CSV dulu');
+        return;
+      }
 
-// supaya error "Illegal return" tidak ganggu
-try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter(x => x.trim());
 
-// ================= LOGIN FUNCTION =================
-function loginUser() {
-  const username = document.getElementById('username')?.value.trim() || '';
-  const password = document.getElementById('password')?.value.trim() || '';
+      if (lines.length < 2) {
+        alert('CSV kosong / tidak valid');
+        return;
+      }
 
-  if (!username || !password) {
-    alert('Username dan password wajib diisi');
+      const delimiter = lines[0].includes(';') ? ';' : ',';
+      const headers = lines[0].toLowerCase().split(delimiter).map(x => x.trim());
+
+      function ambil(cols, nama) {
+        const i = headers.indexOf(nama);
+        return i !== -1 ? (cols[i] || '').trim() : '';
+      }
+
+      const dataInsert = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(delimiter);
+
+        const kode_barang = ambil(cols, 'kode_barang') || ambil(cols, 'kode');
+        const nama_barang = ambil(cols, 'nama_barang') || ambil(cols, 'nama');
+
+        if (!kode_barang || !nama_barang) continue;
+
+        dataInsert.push({
+          kode_barang,
+          nama_barang,
+          barcode: ambil(cols, 'barcode'),
+          gudang: ambil(cols, 'gudang'),
+          lokasi: ambil(cols, 'lokasi'),
+          letak_barang: ambil(cols, 'letak_barang') || ambil(cols, 'letak'),
+          stok_awal: Number(ambil(cols, 'stok_awal') || ambil(cols, 'stok') || 0),
+          stok_minimum: Number(ambil(cols, 'stok_minimum') || 0),
+          status: ambil(cols, 'status') || 'aktif'
+        });
+      }
+
+      if (!dataInsert.length) {
+        alert('Tidak ada data valid');
+        return;
+      }
+
+      const { error } = await client.from('products').insert(dataInsert);
+
+      if (error) {
+        alert('Gagal import: ' + error.message);
+        return;
+      }
+
+      alert('Import berhasil: ' + dataInsert.length + ' data');
+      await loadProducts();
+      await loadTransactions();
+      renderDashboard();
+      renderProductsTable();
+    } catch (err) {
+      console.error(err);
+      alert('Error import: ' + err.message);
+    }
+  }
+
+  window.addEventListener('load', cekSession);
+// ================= IMPORT CSV FINAL BERSIH =================
+async function importBarangCSV() {
+  if (!isAdmin()) {
+    alert('Hanya admin yang bisa import');
     return;
   }
 
-  // LOGIN SEDERHANA (bisa ubah nanti)
-  if (username === 'admin' && password === 'admin123') {
-    localStorage.setItem('isLogin', 'true');
-    localStorage.setItem('role', 'admin');
-    alert('Login berhasil');
-    location.reload();
-  } else {
-    alert('Username atau password salah');
+  try {
+    const file = document.getElementById('import_barang_file').files[0];
+    if (!file) {
+      alert('Pilih file CSV dulu');
+      return;
+    }
+
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).filter(x => x.trim());
+
+    if (lines.length < 2) {
+      alert('File kosong');
+      return;
+    }
+
+    const delimiter = lines[0].includes(';') ? ';' : ',';
+
+    const dataInsert = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(delimiter);
+
+      const kode = cols[0];
+      const nama = cols[1];
+
+      if (!kode || !nama) continue;
+
+      dataInsert.push({
+        kode_barang: kode,
+        nama_barang: nama,
+        barcode: cols[2] || '',
+        stok_awal: Number(cols[3] || 0),
+        gudang: cols[4] || '',
+        lokasi: cols[5] || '',
+        letak_barang: cols[6] || '',
+        stok_minimum: Number(cols[7] || 0),
+        status: 'aktif'
+      });
+    }
+
+    if (!dataInsert.length) {
+      alert('Tidak ada data valid');
+      return;
+    }
+
+    const { error } = await client.from('products').insert(dataInsert);
+
+    if (error) {
+      alert('Gagal import: ' + error.message);
+      return;
+    }
+
+    alert('Import berhasil: ' + dataInsert.length + ' data');
+
+    await loadProducts();
+    await loadTransactions();
+    renderDashboard();
+    renderProductsTable();
+
+  } catch (err) {
+    console.error(err);
+    alert('Error: ' + err.message);
   }
 }
 
-// ================= FIX IMPORT CSV ERROR =================
-function safeCheckDataInsert(dataInsert) {
-  if (!dataInsert || !dataInsert.length) {
-    alert('Tidak ada data valid');
-    return false;
-  }
-  return true;
-}
-
-} catch(e) {
-  console.log('SAFE MODE AKTIF:', e);
-}
+// ================= INIT =================
+window.addEventListener('load', cekSession);
+</script>
 </script>
 </body>
 </html>
