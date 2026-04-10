@@ -1012,7 +1012,7 @@
       document.getElementById('riwayatOpnameWrap').innerHTML = html;
     }
 
-   async function importBarangCSV() {
+ async function importBarangCSV() {
   if (!isAdmin()) return setDebug('Hanya admin yang bisa import data barang.', true);
 
   const fileInput = document.getElementById('import_barang_file');
@@ -1064,24 +1064,38 @@
     }
 
     const rows = [];
+
     for (let i = 1; i < lines.length; i++) {
       const cols = parseCSVLine(lines[i], delimiter);
 
+      const kode = cols[0] || ('ASH' + String(productsData.length + i).padStart(3, '0'));
+      const nama = cols[1] || '';
+
+      const stok = Number(String(cols[3] || 0).replace(/[^\d.-]/g, '')) || 0;
+
       rows.push({
-        kode_barang: cols[0] || ('ASH' + String(productsData.length + i).padStart(3, '0')),
-        nama_barang: cols[1] || '',
+        kode: kode,
+        kode_barang: kode,
+
+        nama: nama,
+        nama_barang: nama,
+
         barcode: cols[2] || '',
-        stok_awal: Number(String(cols[3] || 0).replace(/[^\d.-]/g, '')) || 0,
+
+        stok_awal: stok,
+        stok: stok,
+
         gudang: cols[4] || '',
         lokasi: cols[5] || '',
         letak_barang: cols[6] || '',
+
         status: cols[7] || 'aktif',
         stok_minimum: Number(String(cols[8] || 0).replace(/[^\d.-]/g, '')) || 0
       });
     }
 
     const validRows = rows.filter(r =>
-      r.nama_barang || r.kode_barang || r.barcode
+      r.nama || r.nama_barang || r.kode || r.kode_barang || r.barcode
     );
 
     if (validRows.length === 0) {
@@ -1097,10 +1111,12 @@
     }
 
     setDebug('Import data barang berhasil: ' + validRows.length + ' item');
+
     fileInput.value = '';
     await loadProducts();
     await loadTransactions();
     renderDashboard();
+
   } catch (err) {
     console.error(err);
     setDebug('Gagal import CSV: ' + (err.message || err), true);
