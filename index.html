@@ -1524,20 +1524,6 @@ window.exportPDF = function(){
   </html>
   `;
 
-  const w = window.open("");
-  w.document.write(html);
-  w.document.close();
-  w.print();
-}
-
-function init(){
-  tambahUI();
-  tambahCheckbox();
-}
-
-document.addEventListener("DOMContentLoaded", ()=>{
-  setTimeout(init,500);
-});
 
 })();
 </script>
