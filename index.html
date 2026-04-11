@@ -568,7 +568,7 @@ async function loadProducts() {
     }
 
     function renderProductsTable() {
-      const rows = getFilteredProducts();
+   const rows = getFilteredProducts().filter(item => item.nama_barang);
 
       let html = '<table><tr><th>Kode</th><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Letak</th><th>Stok Awal</th><th>Stok Minimum</th><th>Stok Saat Ini</th><th>Status Stok</th><th>Status Data</th>';
       if (isAdmin()) html += '<th>Aksi</th>';
@@ -985,7 +985,7 @@ async function importBarangCSV() {
     const dataInsert = [];
 
     for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(delimiter).map(x => x.replace(/^"|"$/g, '').trim());
+ if (!cols[0] || !cols[1]) continue;
 
       if (!cols[0] || !cols[1]) continue;
 
