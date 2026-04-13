@@ -1,7 +1,6 @@
 
 
 
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -523,26 +522,17 @@
       renderDashboard();
       setDebug('Semua data berhasil di-refresh.');
     }
-async function loadProducts() {
-  const { data, error } = await client.from('products').select('*');
 
-  if (error) {
-    console.error(error);
-    return;
-  }
+    async function loadProducts() {
+      const { data, error } = await client.from('products').select('*').order('created_at', { ascending: false });
+      if (error) return setDebug('Gagal load products: ' + error.message, true);
+      productsData = data || [];
+      document.getElementById('barang_kode').value = generateKodeBarang();
+      isiDropdownBarangMasuk();
+      isiDropdownBarangKeluar();
+      renderProductsTable();
+    }
 
-  // NORMALISASI FIELD BIAR DASHBOARD BISA BACA
-  productsData = (data || []).map(item => ({
-    ...item,
-
-    // samakan nama field
-    nama: item.nama || item.nama_barang || '',
-    kode: item.kode || item.kode_barang || '',
-
-    // stok
-    stok: item.stok ?? item.stok_awal ?? 0
-  }));
-}
     async function loadTransactions() {
       const { data, error } = await client.from('stock_transactions').select('*').order('tanggal', { ascending: false });
       if (error) return setDebug('Gagal load transaksi: ' + error.message, true);
@@ -1023,145 +1013,63 @@ async function loadProducts() {
       document.getElementById('riwayatOpnameWrap').innerHTML = html;
     }
 
- async function importBarangCSV() {
-  if (!isAdmin()) {
-    setDebug('Hanya admin yang bisa import data barang.', true);
-    return;
-  }
+    async function importBarangCSV() {
+      if (!isAdmin()) return setDebug('Hanya admin yang bisa import data barang.', true);
 
-  const fileInput = document.getElementById('import_barang_file');
-  const file = fileInput?.files?.[0];
+      const fileInput = document.getElementById('import_barang_file');
+      const file = fileInput.files[0];
 
-  if (!file) {
-    setDebug('Pilih file CSV dulu.', true);
-    return;
-  }
-
-  try {
-    const text = await file.text();
-
-    const lines = text
-      .split(/\r?\n/)
-      .map(x => x.trim())
-      .filter(x => x);
-
-    if (lines.length < 2) {
-      setDebug('File CSV kosong atau tidak valid.', true);
-      return;
-    }
-
-    const delimiter = lines[0].includes(';') ? ';' : ',';
-
-    function parseCSVLine(line, delimiter = ',') {
-      const result = [];
-      let current = '';
-      let inQuotes = false;
-
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        const next = line[i + 1];
-
-        if (char === '"') {
-          if (inQuotes && next === '"') {
-            current += '"';
-            i++;
-          } else {
-            inQuotes = !inQuotes;
-          }
-        } else if (char === delimiter && !inQuotes) {
-          result.push(current.trim());
-          current = '';
-        } else {
-          current += char;
-        }
+      if (!file) {
+        setDebug('Pilih file CSV dulu.', true);
+        return;
       }
 
-      result.push(current.trim());
-      return result.map(v => v.replace(/^"|"$/g, '').trim());
-    }
+      const text = await file.text();
+      const lines = text.split('\n').map(x => x.trim()).filter(x => x);
 
-    function normalizeHeader(header) {
-      return (header || '')
-        .toLowerCase()
-        .trim()
-        .replace(/\s+/g, '_');
-    }
-
-    const headers = parseCSVLine(lines[0], delimiter).map(normalizeHeader);
-
-    function getCol(cols, possibleNames) {
-      for (const name of possibleNames) {
-        const idx = headers.indexOf(name);
-        if (idx !== -1) return cols[idx] ?? '';
+      if (lines.length < 2) {
+        setDebug('File CSV kosong atau tidak valid.', true);
+        return;
       }
-      return '';
-    }
 
-    const rows = [];
+      const rows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(x => x.replace(/^"|"$/g, '').trim());
 
-    for (let i = 1; i < lines.length; i++) {
-      const cols = parseCSVLine(lines[i], delimiter);
-
-      const kode = getCol(cols, ['kode', 'kode_barang', 'item_code', 'sku']);
-      const nama_barang = getCol(cols, ['nama_barang', 'nama', 'nama_item', 'item_name']);
-      const barcode = getCol(cols, ['barcode', 'kode_barcode']);
-      const stok_awal = Number(getCol(cols, ['stok_awal', 'stok']) || 0);
-      const gudang = getCol(cols, ['gudang', 'warehouse']);
-      const lokasi = getCol(cols, ['lokasi', 'location']);
-      const letak = getCol(cols, ['letak', 'letak_barang', 'rak', 'posisi']);
-      const stok_minimum = Number(getCol(cols, ['stok_minimum', 'minimum_stok', 'min_stok']) || 0);
-      const status_data = getCol(cols, ['status_data', 'status']) || 'aktif';
-
-      if (!kode && !nama_barang) continue;
-
-      rows.push({
-        id: crypto.randomUUID(),
-        kode: kode,
-        nama_barang: nama_barang,
-        barcode: barcode,
-        gudang: gudang,
-        lokasi: lokasi,
-        letak: letak,
-        stok_awal: stok_awal,
-        stok_minimum: stok_minimum,
-        stok_saat_ini: stok_awal,
-        status_data: status_data
-      });
-    }
-
-    if (!rows.length) {
-      setDebug('Tidak ada data yang berhasil dibaca dari CSV.', true);
-      return;
-    }
-
-    let barangLama = JSON.parse(localStorage.getItem('data_barang') || '[]');
-
-    rows.forEach(newItem => {
-      const index = barangLama.findIndex(x => String(x.kode).trim() === String(newItem.kode).trim());
-      if (index >= 0) {
-        barangLama[index] = {
-          ...barangLama[index],
-          ...newItem
-        };
-      } else {
-        barangLama.push(newItem);
+        rows.push({
+          kode_barang: cols[0] || ('ASH' + String(productsData.length + i).padStart(3, '0')),
+          nama_barang: cols[1] || '',
+          barcode: cols[2] || '',
+          stok_awal: Number(cols[3] || 0),
+          gudang: cols[4] || '',
+          lokasi: cols[5] || '',
+          letak_barang: cols[6] || '',
+          status: cols[7] || 'aktif',
+          stok_minimum: Number(cols[8] || 0)
+        });
       }
-    });
 
-    localStorage.setItem('data_barang', JSON.stringify(barangLama));
+      const validRows = rows.filter(r => r.nama_barang);
 
-    if (typeof loadDataBarang === 'function') loadDataBarang();
-    if (typeof renderTableBarang === 'function') renderTableBarang();
-    if (typeof tampilkanDataBarang === 'function') tampilkanDataBarang();
+      if (validRows.length === 0) {
+        setDebug('Tidak ada data barang valid untuk diimport.', true);
+        return;
+      }
 
-    fileInput.value = '';
-    setDebug(`Import berhasil. ${rows.length} data diproses.`, false);
+      const { error } = await client.from('products').insert(validRows);
 
-  } catch (err) {
-    console.error(err);
-    setDebug('Terjadi error saat import CSV: ' + err.message, true);
-  }
-}
+      if (error) {
+        setDebug('Gagal import barang: ' + error.message, true);
+        return;
+      }
+
+      setDebug('Import data barang berhasil: ' + validRows.length + ' item');
+      fileInput.value = '';
+      await loadProducts();
+      await loadTransactions();
+      renderDashboard();
+    }
+
     function downloadCSV(filename, rows) {
       const csvContent = rows.map(row =>
         row.map(value => {
@@ -1203,7 +1111,6 @@ async function loadProducts() {
       win.document.close();
       win.print();
     }
-
 
     function buildStokRows(data) {
       const rows = [[
@@ -1422,7 +1329,1074 @@ async function loadProducts() {
     }
 
     window.addEventListener('load', cekSession);
+  </script>
+  <script>
+(function () {
+  // ================================
+  // LOAD LIBRARY PDF OTOMATIS
+  // ================================
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const old = document.querySelector('script[src="' + src + '"]');
+      if (old) return resolve();
+      const s = document.createElement("script");
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
 
+  async function ensurePdfLibs() {
+    if (!window.jspdf) {
+      await loadScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js");
+    }
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      throw new Error("Library jsPDF gagal dimuat");
+    }
+    if (!window.jspdf || !window.jspdf.jsPDF || !(window.jspdf && window.jspdf.jsPDF)) {
+      throw new Error("jsPDF tidak tersedia");
+    }
+    if (!(window.jspdf && window.jspdf.jsPDF) || !window.jspdf) {
+      throw new Error("jsPDF belum aktif");
+    }
+    if (!window.jsPDF && !window.jspdf) {
+      throw new Error("PDF library belum aktif");
+    }
+    if (!window.jspdf || !window.jspdf.jsPDF || !window.jspdf.jsPDF.API) {
+      // lanjut saja, kadang API terpasang setelah plugin
+    }
+    await loadScript("https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js");
+  }
+
+  // ================================
+  // STATE
+  // ================================
+  window.appState = window.appState || {};
+  appState.kartuStok = appState.kartuStok || [];
+
+  // ================================
+  // UTIL
+  // ================================
+  function formatTanggal(value) {
+    if (!value) return "";
+    try {
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return String(value);
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yy = d.getFullYear();
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mi = String(d.getMinutes()).padStart(2, "0");
+      return dd + "-" + mm + "-" + yy + " " + hh + ":" + mi;
+    } catch (e) {
+      return String(value);
+    }
+  }
+
+  function escapeHtml(text) {
+    return String(text ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function ambilDataKartuStok() {
+    const candidates = [
+      appState.kartuStok,
+      appState.stockTransactions,
+      appState.stock_transactions,
+      appState.v_kartu_stok,
+      appState.transactions
+    ];
+    for (const c of candidates) {
+      if (Array.isArray(c) && c.length) return c;
+    }
+    return [];
+  }
+
+  function guessTableBody() {
+    const selectors = [
+      "#kartu-stok-table tbody",
+      "#table-kartu-stok tbody",
+      "#tbl-kartu-stok tbody",
+      "#kartuStokTable tbody",
+      "table tbody"
+    ];
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (el) return el;
+    }
+    return null;
+  }
+
+  function ensureToolbar() {
+    if (document.getElementById("toolbar-export-kartu-stok")) return;
+
+    let target =
+      document.querySelector("#kartu-stok") ||
+      document.querySelector("#menu-kartu-stok") ||
+      document.querySelector(".kartu-stok") ||
+      document.querySelector(".menu-kartu-stok") ||
+      guessTableBody()?.closest("table")?.parentElement ||
+      document.body;
+
+    const bar = document.createElement("div");
+    bar.id = "toolbar-export-kartu-stok";
+    bar.style.display = "flex";
+    bar.style.gap = "10px";
+    bar.style.flexWrap = "wrap";
+    bar.style.marginBottom = "12px";
+    bar.innerHTML = `
+      <button type="button" id="btn-pilih-semua-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#334155; color:#fff; font-weight:700; cursor:pointer;">
+        Pilih Semua
+      </button>
+      <button type="button" id="btn-batal-pilih-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#64748b; color:#fff; font-weight:700; cursor:pointer;">
+        Batal Pilih
+      </button>
+      <button type="button" id="btn-export-pdf-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#16a34a; color:#fff; font-weight:700; cursor:pointer;">
+        Export PDF
+      </button>
+    `;
+
+    if (target.firstChild) {
+      target.insertBefore(bar, target.firstChild);
+    } else {
+      target.appendChild(bar);
+    }
+
+    document.getElementById("btn-pilih-semua-kartu-stok").onclick = pilihSemuaKartuStok;
+    document.getElementById("btn-batal-pilih-kartu-stok").onclick = batalPilihKartuStok;
+    document.getElementById("btn-export-pdf-kartu-stok").onclick = exportKartuStokPDF;
+  }
+
+  function ensureCheckboxColumn() {
+    const tbody = guessTableBody();
+    if (!tbody) return;
+
+    const table = tbody.closest("table");
+    if (!table) return;
+
+    const theadRow = table.querySelector("thead tr");
+    if (theadRow && !theadRow.querySelector(".th-pilih-kartu-stok")) {
+      const th = document.createElement("th");
+      th.className = "th-pilih-kartu-stok";
+      th.textContent = "Pilih";
+      theadRow.insertBefore(th, theadRow.firstChild);
+    }
+
+    const rows = tbody.querySelectorAll("tr");
+    rows.forEach((tr, idx) => {
+      if (tr.querySelector(".pilih-kartu-stok")) return;
+      const data = ambilDataKartuStok();
+      const rowData = data[idx] || {};
+      const id = rowData.id || ("row_" + idx);
+
+      const td = document.createElement("td");
+      td.innerHTML = '<input type="checkbox" class="pilih-kartu-stok" value="' + escapeHtml(id) + '">';
+      tr.insertBefore(td, tr.firstChild);
+    });
+  }
+
+  function syncCheckboxWithData() {
+    const tbody = guessTableBody();
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll("tr");
+    const data = ambilDataKartuStok();
+
+    rows.forEach((tr, idx) => {
+      const cb = tr.querySelector(".pilih-kartu-stok");
+      if (!cb) return;
+      const rowData = data[idx] || {};
+      cb.value = rowData.id || ("row_" + idx);
+    });
+  }
+
+  function getSelectedRows() {
+    const data = ambilDataKartuStok();
+    const selected = [...document.querySelectorAll(".pilih-kartu-stok:checked")].map(x => String(x.value));
+
+    if (!selected.length) return data;
+
+    return data.filter((row, idx) => {
+      const id = row.id || ("row_" + idx);
+      return selected.includes(String(id));
+    });
+  }
+
+  // ================================
+  // ACTIONS
+  // ================================
+  window.pilihSemuaKartuStok = function () {
+    document.querySelectorAll(".pilih-kartu-stok").forEach(el => el.checked = true);
+  };
+
+  window.batalPilihKartuStok = function () {
+    document.querySelectorAll(".pilih-kartu-stok").forEach(el => el.checked = false);
+  };
+
+  window.exportKartuStokPDF = async function () {
+    try {
+      await ensurePdfLibs();
+
+      const rows = getSelectedRows();
+      if (!rows.length) {
+        alert("Data kartu stok tidak ada.");
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF("l", "mm", "a4");
+
+      const body = rows.map((row, i) => [
+        i + 1,
+        formatTanggal(row.created_at || row.tanggal || row.transaction_date || row.date || ""),
+        row.kode || row.kode_barang || row.product_code || "",
+        row.nama || row.nama_barang || row.product_name || "",
+        row.gudang || row.warehouse || "",
+        row.lokasi || row.rak || row.location || "",
+        row.letak || row.bin || "",
+        row.jenis || row.tipe || row.transaction_type || "",
+        Number(row.masuk || row.qty_masuk || row.in_qty || 0),
+        Number(row.keluar || row.qty_keluar || row.out_qty || 0),
+        Number(row.saldo || row.stok || row.balance || 0),
+        row.keterangan || row.note || ""
+      ]);
+
+      doc.setFontSize(14);
+      doc.text("Laporan Kartu Stok", 14, 12);
+
+      doc.setFontSize(9);
+      doc.text("Export: semua data atau item yang dicentang", 14, 18);
+
+      doc.autoTable({
+        startY: 22,
+        head: [[
+          "No",
+          "Tanggal",
+          "Kode",
+          "Nama Barang",
+          "Gudang",
+          "Lokasi",
+          "Letak",
+          "Jenis",
+          "Masuk",
+          "Keluar",
+          "Saldo",
+          "Keterangan"
+        ]],
+        body: body,
+        styles: {
+          fontSize: 7,
+          cellPadding: 2
+        },
+        margin: {
+          top: 22,
+          right: 8,
+          bottom: 10,
+          left: 8
+        }
+      });
+
+      doc.save("kartu_stok.pdf");
+    } catch (err) {
+      console.error(err);
+      alert("Gagal export PDF: " + err.message);
+    }
+  };
+
+  // ================================
+  // PATCH LOAD DATA
+  // ================================
+  const oldLoadAllData = window.loadAllData;
+  window.loadAllData = async function () {
+    if (typeof oldLoadAllData === "function") {
+      await oldLoadAllData();
+    }
+
+    try {
+      if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+        let res = await fetch(`${SUPABASE_URL}/rest/v1/v_kartu_stok?select=*`, {
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+          }
+        });
+
+        if (!res.ok) {
+          res = await fetch(`${SUPABASE_URL}/rest/v1/stock_transactions?select=*`, {
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+            }
+          });
+        }
+
+        if (res.ok) {
+          const data = await res.json();
+          appState.kartuStok = Array.isArray(data) ? data : [];
+        }
+      }
+    } catch (e) {
+      console.warn("Load kartu stok gagal:", e);
+    }
+
+    setTimeout(() => {
+      ensureToolbar();
+      ensureCheckboxColumn();
+      syncCheckboxWithData();
+    }, 300);
+  };
+
+  // ================================
+  // INIT
+  // ================================
+  document.addEventListener("DOMContentLoaded", function () {
+    ensureToolbar();
+    setTimeout(() => {
+      ensureCheckboxColumn();
+      syncCheckboxWithData();
+    }, 500);
+
+    if (typeof window.loadAllData === "function") {
+      window.loadAllData();
+    }
+  });
+
+  const observer = new MutationObserver(() => {
+    ensureToolbar();
+    ensureCheckboxColumn();
+    syncCheckboxWithData();
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+})();
+</script>
+  <script>
+(function () {
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector('script[src="' + src + '"]')) return resolve();
+      const s = document.createElement("script");
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  async function ensureExportLibs() {
+    if (!window.jspdf) {
+      await loadScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js");
+    }
+    if (!window.XLSX) {
+      await loadScript("https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js");
+    }
+    await loadScript("https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js");
+  }
+
+  function formatTanggal(value) {
+    if (!value) return "";
+    try {
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return String(value);
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yy = d.getFullYear();
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mi = String(d.getMinutes()).padStart(2, "0");
+      return `${dd}-${mm}-${yy} ${hh}:${mi}`;
+    } catch {
+      return String(value);
+    }
+  }
+
+  function getKartuStokTable() {
+    const tables = Array.from(document.querySelectorAll("table"));
+    for (const table of tables) {
+      const text = table.innerText.toLowerCase();
+      if (
+        text.includes("nama barang") &&
+        text.includes("saldo akhir") &&
+        text.includes("gudang")
+      ) {
+        return table;
+      }
+    }
+    return null;
+  }
+
+  function ensureToolbar() {
+    if (document.getElementById("toolbar-export-kartu-stok")) return;
+
+    const table = getKartuStokTable();
+    if (!table) return;
+
+    const wrap = document.createElement("div");
+    wrap.id = "toolbar-export-kartu-stok";
+    wrap.style.display = "flex";
+    wrap.style.gap = "10px";
+    wrap.style.flexWrap = "wrap";
+    wrap.style.margin = "12px 0";
+
+    wrap.innerHTML = `
+      <button type="button" id="btn-pilih-semua-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#334155; color:#fff; font-weight:700; cursor:pointer;">Pilih Semua</button>
+      <button type="button" id="btn-batal-pilih-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#64748b; color:#fff; font-weight:700; cursor:pointer;">Batal Pilih</button>
+      <button type="button" id="btn-export-excel-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#0f766e; color:#fff; font-weight:700; cursor:pointer;">Export Excel</button>
+      <button type="button" id="btn-export-pdf-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#16a34a; color:#fff; font-weight:700; cursor:pointer;">Export PDF</button>
+    `;
+
+    table.parentElement.insertBefore(wrap, table);
+
+    document.getElementById("btn-pilih-semua-kartu-stok").onclick = pilihSemuaKartuStok;
+    document.getElementById("btn-batal-pilih-kartu-stok").onclick = batalPilihKartuStok;
+    document.getElementById("btn-export-excel-kartu-stok").onclick = exportKartuStokExcel;
+    document.getElementById("btn-export-pdf-kartu-stok").onclick = exportKartuStokPDF;
+  }
+
+  function ensureCheckboxColumn() {
+    const table = getKartuStokTable();
+    if (!table) return;
+
+    const theadRow = table.querySelector("thead tr");
+    if (theadRow && !theadRow.querySelector(".th-pilih-kartu-stok")) {
+      const th = document.createElement("th");
+      th.className = "th-pilih-kartu-stok";
+      th.textContent = "Pilih";
+      theadRow.insertBefore(th, theadRow.firstChild);
+    }
+
+    const rows = table.querySelectorAll("tbody tr");
+    rows.forEach((tr, idx) => {
+      if (tr.querySelector(".pilih-kartu-stok")) return;
+
+      const td = document.createElement("td");
+      td.innerHTML = `<input type="checkbox" class="pilih-kartu-stok" data-row="${idx}">`;
+      tr.insertBefore(td, tr.firstChild);
+    });
+  }
+
+  function pilihSemuaKartuStok() {
+    document.querySelectorAll(".pilih-kartu-stok").forEach(el => el.checked = true);
+  }
+
+  function batalPilihKartuStok() {
+    document.querySelectorAll(".pilih-kartu-stok").forEach(el => el.checked = false);
+  }
+
+  function getVisibleTableRows() {
+    const table = getKartuStokTable();
+    if (!table) return [];
+
+    const rows = Array.from(table.querySelectorAll("tbody tr"));
+    return rows.filter(tr => tr.style.display !== "none");
+  }
+
+  function extractRowsForExport() {
+    const allRows = getVisibleTableRows();
+    if (!allRows.length) return [];
+
+    const checked = allRows.filter(tr => {
+      const cb = tr.querySelector(".pilih-kartu-stok");
+      return cb && cb.checked;
+    });
+
+    const targetRows = checked.length ? checked : allRows;
+
+    return targetRows.map((tr, i) => {
+      const tds = tr.querySelectorAll("td");
+      const start = tr.querySelector(".pilih-kartu-stok") ? 1 : 0;
+
+      return {
+        no: i + 1,
+        tanggal: formatTanggal(tds[start + 0]?.innerText.trim() || ""),
+        kode: tds[start + 1]?.innerText.trim() || "",
+        nama_barang: tds[start + 2]?.innerText.trim() || "",
+        masuk: tds[start + 3]?.innerText.trim() || "",
+        keluar: tds[start + 4]?.innerText.trim() || "",
+        saldo_akhir: tds[start + 5]?.innerText.trim() || "",
+        gudang: tds[start + 6]?.innerText.trim() || "",
+        lokasi: tds[start + 7]?.innerText.trim() || "",
+        keterangan: tds[start + 8]?.innerText.trim() || ""
+      };
+    });
+  }
+
+  async function exportKartuStokExcel() {
+    try {
+      await ensureExportLibs();
+
+      const rows = extractRowsForExport();
+      if (!rows.length) {
+        alert("Data kartu stok tidak ada.");
+        return;
+      }
+
+      const data = rows.map(x => ({
+        No: x.no,
+        Tanggal: x.tanggal,
+        Kode: x.kode,
+        "Nama Barang": x.nama_barang,
+        Masuk: x.masuk,
+        Keluar: x.keluar,
+        "Saldo Akhir": x.saldo_akhir,
+        Gudang: x.gudang,
+        Lokasi: x.lokasi,
+        Keterangan: x.keterangan
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Kartu Stok");
+      XLSX.writeFile(wb, "kartu_stok.xlsx");
+    } catch (err) {
+      console.error(err);
+      alert("Gagal export Excel: " + err.message);
+    }
+  }
+
+  async function exportKartuStokPDF() {
+    try {
+      await ensureExportLibs();
+
+      const rows = extractRowsForExport();
+      if (!rows.length) {
+        alert("Data kartu stok tidak ada.");
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF("l", "mm", "a4");
+
+      doc.setFontSize(14);
+      doc.text("Laporan Kartu Stok", 14, 12);
+
+      doc.setFontSize(9);
+      doc.text("Data: semua baris tampil atau item yang dicentang", 14, 18);
+
+      doc.autoTable({
+        startY: 22,
+        head: [[
+          "No", "Tanggal", "Kode", "Nama Barang", "Masuk", "Keluar",
+          "Saldo Akhir", "Gudang", "Lokasi", "Keterangan"
+        ]],
+        body: rows.map(x => [
+          x.no,
+          x.tanggal,
+          x.kode,
+          x.nama_barang,
+          x.masuk,
+          x.keluar,
+          x.saldo_akhir,
+          x.gudang,
+          x.lokasi,
+          x.keterangan
+        ]),
+        styles: {
+          fontSize: 8,
+          cellPadding: 2
+        },
+        margin: {
+          top: 22,
+          right: 8,
+          bottom: 10,
+          left: 8
+        }
+      });
+
+      doc.save("kartu_stok.pdf");
+    } catch (err) {
+      console.error(err);
+      alert("Gagal export PDF: " + err.message);
+    }
+  }
+
+  function initExportKartuStok() {
+    ensureToolbar();
+    ensureCheckboxColumn();
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    setTimeout(initExportKartuStok, 500);
+  });
+
+  const observer = new MutationObserver(() => {
+    initExportKartuStok();
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  window.pilihSemuaKartuStok = pilihSemuaKartuStok;
+  window.batalPilihKartuStok = batalPilihKartuStok;
+  window.exportKartuStokExcel = exportKartuStokExcel;
+  window.exportKartuStokPDF = exportKartuStokPDF;
+})();
+</script
+  <script>
+(function () {
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector('script[src="' + src + '"]')) return resolve();
+      const s = document.createElement("script");
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  async function ensureExportLibs() {
+    if (!window.jspdf) {
+      await loadScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js");
+    }
+    if (!window.XLSX) {
+      await loadScript("https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js");
+    }
+    await loadScript("https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js");
+  }
+
+  function getKartuStokTable() {
+    if (document.querySelector("#kartu-stok-table")) {
+      return document.querySelector("#kartu-stok-table");
+    }
+
+    const tables = Array.from(document.querySelectorAll("table"));
+    for (const table of tables) {
+      const heads = Array.from(table.querySelectorAll("thead th")).map(th => th.innerText.trim().toLowerCase());
+      const joined = heads.join("|");
+      if (
+        joined.includes("tanggal") &&
+        joined.includes("nama barang") &&
+        joined.includes("saldo akhir")
+      ) {
+        return table;
+      }
+    }
+    return null;
+  }
+
+  function ensureToolbar() {
+    if (document.getElementById("toolbar-export-kartu-stok")) return;
+
+    const table = getKartuStokTable();
+    if (!table) return;
+
+    const wrap = document.createElement("div");
+    wrap.id = "toolbar-export-kartu-stok";
+    wrap.style.display = "flex";
+    wrap.style.gap = "10px";
+    wrap.style.flexWrap = "wrap";
+    wrap.style.margin = "12px 0";
+
+    wrap.innerHTML = `
+      <button type="button" id="btn-pilih-semua-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#334155; color:#fff; font-weight:700; cursor:pointer;">Pilih Semua</button>
+      <button type="button" id="btn-batal-pilih-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#64748b; color:#fff; font-weight:700; cursor:pointer;">Batal Pilih</button>
+      <button type="button" id="btn-export-excel-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#0f766e; color:#fff; font-weight:700; cursor:pointer;">Export Excel</button>
+      <button type="button" id="btn-export-pdf-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#16a34a; color:#fff; font-weight:700; cursor:pointer;">Export PDF</button>
+    `;
+
+    table.parentElement.insertBefore(wrap, table);
+
+    document.getElementById("btn-pilih-semua-kartu-stok").onclick = pilihSemuaKartuStok;
+    document.getElementById("btn-batal-pilih-kartu-stok").onclick = batalPilihKartuStok;
+    document.getElementById("btn-export-excel-kartu-stok").onclick = exportKartuStokExcel;
+    document.getElementById("btn-export-pdf-kartu-stok").onclick = exportKartuStokPDF;
+  }
+
+  function ensureCheckboxColumn() {
+    const table = getKartuStokTable();
+    if (!table) return;
+
+    const theadRow = table.querySelector("thead tr");
+    if (theadRow && !theadRow.querySelector(".th-pilih-kartu-stok")) {
+      const th = document.createElement("th");
+      th.className = "th-pilih-kartu-stok";
+      th.style.width = "40px";
+      th.innerHTML = `<input type="checkbox" id="check-all-kartu-stok" title="Pilih semua">`;
+      theadRow.insertBefore(th, theadRow.firstChild);
+
+      const checkAll = th.querySelector("#check-all-kartu-stok");
+      if (checkAll) {
+        checkAll.addEventListener("change", function () {
+          document.querySelectorAll(".pilih-kartu-stok").forEach(el => {
+            el.checked = this.checked;
+          });
+        });
+      }
+    }
+
+    const rows = table.querySelectorAll("tbody tr");
+    rows.forEach((tr, idx) => {
+      if (tr.querySelector(".pilih-kartu-stok")) return;
+      const td = document.createElement("td");
+      td.style.textAlign = "center";
+      td.innerHTML = `<input type="checkbox" class="pilih-kartu-stok" data-row="${idx}">`;
+      tr.insertBefore(td, tr.firstChild);
+    });
+  }
+
+  window.pilihSemuaKartuStok = function () {
+    document.querySelectorAll(".pilih-kartu-stok").forEach(el => el.checked = true);
+    const all = document.getElementById("check-all-kartu-stok");
+    if (all) all.checked = true;
+  };
+
+  window.batalPilihKartuStok = function () {
+    document.querySelectorAll(".pilih-kartu-stok").forEach(el => el.checked = false);
+    const all = document.getElementById("check-all-kartu-stok");
+    if (all) all.checked = false;
+  };
+
+  function getVisibleRows() {
+    const table = getKartuStokTable();
+    if (!table) return [];
+    return Array.from(table.querySelectorAll("tbody tr")).filter(tr => {
+      const style = window.getComputedStyle(tr);
+      return style.display !== "none" && style.visibility !== "hidden";
+    });
+  }
+
+  function ambilText(td) {
+    return (td?.innerText || "").trim();
+  }
+
+  function extractRowsForExport() {
+    const allRows = getVisibleRows();
+    if (!allRows.length) return [];
+
+    const checkedRows = allRows.filter(tr => {
+      const cb = tr.querySelector(".pilih-kartu-stok");
+      return cb && cb.checked;
+    });
+
+    const targetRows = checkedRows.length ? checkedRows : allRows;
+
+    return targetRows.map((tr, i) => {
+      const tds = tr.querySelectorAll("td");
+
+      return {
+        no: i + 1,
+        tanggal: ambilText(tds[1]),
+        kode: ambilText(tds[2]),
+        nama_barang: ambilText(tds[3]),
+        masuk: ambilText(tds[4]),
+        keluar: ambilText(tds[5]),
+        saldo_akhir: ambilText(tds[6]),
+        gudang: ambilText(tds[7]),
+        lokasi: ambilText(tds[8]),
+        keterangan: ambilText(tds[9])
+      };
+    });
+  }
+
+  window.exportKartuStokExcel = async function () {
+    try {
+      await ensureExportLibs();
+
+      const rows = extractRowsForExport();
+      if (!rows.length) {
+        alert("Data kartu stok tidak ada.");
+        return;
+      }
+
+      const data = rows.map(x => ({
+        No: x.no,
+        Tanggal: x.tanggal,
+        Kode: x.kode,
+        "Nama Barang": x.nama_barang,
+        Masuk: x.masuk,
+        Keluar: x.keluar,
+        "Saldo Akhir": x.saldo_akhir,
+        Gudang: x.gudang,
+        Lokasi: x.lokasi,
+        Keterangan: x.keterangan
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Kartu Stok");
+      XLSX.writeFile(wb, "kartu_stok.xlsx");
+    } catch (err) {
+      console.error(err);
+      alert("Gagal export Excel: " + err.message);
+    }
+  };
+
+  window.exportKartuStokPDF = async function () {
+    try {
+      await ensureExportLibs();
+
+      const rows = extractRowsForExport();
+      if (!rows.length) {
+        alert("Data kartu stok tidak ada.");
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF("l", "mm", "a4");
+
+      doc.setFontSize(14);
+      doc.text("Laporan Kartu Stok", 14, 12);
+
+      doc.setFontSize(9);
+      doc.text("Sumber: data yang tampil di tabel", 14, 18);
+
+      doc.autoTable({
+        startY: 22,
+        head: [[
+          "No", "Tanggal", "Kode", "Nama Barang", "Masuk", "Keluar",
+          "Saldo Akhir", "Gudang", "Lokasi", "Keterangan"
+        ]],
+        body: rows.map(x => [
+          x.no,
+          x.tanggal,
+          x.kode,
+          x.nama_barang,
+          x.masuk,
+          x.keluar,
+          x.saldo_akhir,
+          x.gudang,
+          x.lokasi,
+          x.keterangan
+        ]),
+        styles: {
+          fontSize: 8,
+          cellPadding: 2
+        },
+        margin: {
+          top: 22,
+          right: 8,
+          bottom: 10,
+          left: 8
+        }
+      });
+
+      doc.save("kartu_stok.pdf");
+    } catch (err) {
+      console.error(err);
+      alert("Gagal export PDF: " + err.message);
+    }
+  };
+
+  function initKartuStokExport() {
+    ensureToolbar();
+    ensureCheckboxColumn();
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    setTimeout(initKartuStokExport, 500);
+    setTimeout(initKartuStokExport, 1200);
+  });
+
+  const observer = new MutationObserver(() => {
+    initKartuStokExport();
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+})();
+</script>
+  <script>
+(function () {
+  function getKartuStokTable() {
+    if (document.querySelector("#kartu-stok-table")) {
+      return document.querySelector("#kartu-stok-table");
+    }
+
+    const tables = Array.from(document.querySelectorAll("table"));
+    for (const table of tables) {
+      const heads = Array.from(table.querySelectorAll("thead th")).map(th => th.innerText.trim().toLowerCase());
+      const joined = heads.join("|");
+      if (
+        joined.includes("tanggal") &&
+        joined.includes("nama barang") &&
+        joined.includes("saldo akhir")
+      ) {
+        return table;
+      }
+    }
+    return null;
+  }
+
+  function getFilterInputs() {
+    const textInputs = Array.from(document.querySelectorAll("input[type='text']"));
+    let namaInput = null;
+    let gudangInput = null;
+    let lokasiInput = null;
+
+    textInputs.forEach(input => {
+      const area = (
+        input.previousElementSibling?.innerText ||
+        input.parentElement?.innerText ||
+        ""
+      ).toLowerCase();
+
+      if (!namaInput && area.includes("nama barang")) namaInput = input;
+      else if (!gudangInput && area.includes("gudang")) gudangInput = input;
+      else if (!lokasiInput && area.includes("lokasi")) lokasiInput = input;
+    });
+
+    return { namaInput, gudangInput, lokasiInput };
+  }
+
+  function ensureTanggalFilterUI() {
+    if (document.getElementById("filterTanggalAwal")) return;
+
+    const table = getKartuStokTable();
+    if (!table) return;
+
+    const { namaInput, gudangInput, lokasiInput } = getFilterInputs();
+    const anchor = lokasiInput?.parentElement || gudangInput?.parentElement || namaInput?.parentElement;
+
+    const wrap = document.createElement("div");
+    wrap.id = "tanggal-filter-kartu-stok-wrap";
+    wrap.style.display = "grid";
+    wrap.style.gridTemplateColumns = "repeat(auto-fit, minmax(220px, 1fr))";
+    wrap.style.gap = "12px";
+    wrap.style.margin = "12px 0";
+
+    wrap.innerHTML = `
+      <div>
+        <label style="display:block; font-weight:600; margin-bottom:6px;">Filter Tanggal Awal</label>
+        <input type="date" id="filterTanggalAwal" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:10px;">
+      </div>
+      <div>
+        <label style="display:block; font-weight:600; margin-bottom:6px;">Filter Tanggal Akhir</label>
+        <input type="date" id="filterTanggalAkhir" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:10px;">
+      </div>
+      <div style="display:flex; align-items:end;">
+        <button type="button" id="btnResetFilterTanggalKartuStok" style="padding:10px 14px; border:none; border-radius:10px; background:#334155; color:#fff; font-weight:700; cursor:pointer;">
+          Reset Filter
+        </button>
+      </div>
+    `;
+
+    if (anchor && anchor.parentElement) {
+      anchor.parentElement.insertAdjacentElement("afterend", wrap);
+    } else {
+      table.parentElement.insertBefore(wrap, table);
+    }
+
+    document.getElementById("filterTanggalAwal").addEventListener("input", filterKartuStokByTanggal);
+    document.getElementById("filterTanggalAkhir").addEventListener("input", filterKartuStokByTanggal);
+    document.getElementById("btnResetFilterTanggalKartuStok").addEventListener("click", resetFilterTanggalKartuStok);
+  }
+
+  function parseRowDate(text) {
+    if (!text) return null;
+
+    let d = new Date(text);
+    if (!isNaN(d.getTime())) return d;
+
+    const cleaned = String(text).trim();
+
+    const match1 = cleaned.match(/^(\d{2})-(\d{2})-(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+    if (match1) {
+      const dd = parseInt(match1[1], 10);
+      const mm = parseInt(match1[2], 10) - 1;
+      const yy = parseInt(match1[3], 10);
+      const hh = parseInt(match1[4] || "0", 10);
+      const mi = parseInt(match1[5] || "0", 10);
+      return new Date(yy, mm, dd, hh, mi, 0);
+    }
+
+    const match2 = cleaned.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match2) {
+      const yy = parseInt(match2[1], 10);
+      const mm = parseInt(match2[2], 10) - 1;
+      const dd = parseInt(match2[3], 10);
+      return new Date(yy, mm, dd, 0, 0, 0);
+    }
+
+    return null;
+  }
+
+  function filterKartuStokByTanggal() {
+    const table = getKartuStokTable();
+    if (!table) return;
+
+    const tanggalAwal = document.getElementById("filterTanggalAwal")?.value || "";
+    const tanggalAkhir = document.getElementById("filterTanggalAkhir")?.value || "";
+
+    const rows = Array.from(table.querySelectorAll("tbody tr"));
+
+    rows.forEach(tr => {
+      const tds = tr.querySelectorAll("td");
+      if (!tds.length) return;
+
+      let tanggalText = "";
+      if (tds.length >= 10) {
+        tanggalText = (tds[1]?.innerText || "").trim();
+      } else {
+        tanggalText = (tds[0]?.innerText || "").trim();
+      }
+
+      const rowDate = parseRowDate(tanggalText);
+
+      let show = true;
+
+      if (tanggalAwal && rowDate) {
+        const awal = new Date(tanggalAwal + "T00:00:00");
+        if (rowDate < awal) show = false;
+      }
+
+      if (tanggalAkhir && rowDate) {
+        const akhir = new Date(tanggalAkhir + "T23:59:59");
+        if (rowDate > akhir) show = false;
+      }
+
+      if ((tanggalAwal || tanggalAkhir) && !rowDate) {
+        show = false;
+      }
+
+      tr.style.display = show ? "" : "none";
+    });
+  }
+
+  function resetFilterTanggalKartuStok() {
+    const awal = document.getElementById("filterTanggalAwal");
+    const akhir = document.getElementById("filterTanggalAkhir");
+    if (awal) awal.value = "";
+    if (akhir) akhir.value = "";
+
+    const table = getKartuStokTable();
+    if (!table) return;
+
+    table.querySelectorAll("tbody tr").forEach(tr => {
+      tr.style.display = "";
+    });
+  }
+
+  function initTanggalFilterKartuStok() {
+    ensureTanggalFilterUI();
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    setTimeout(initTanggalFilterKartuStok, 500);
+    setTimeout(initTanggalFilterKartuStok, 1200);
+  });
+
+  const observer = new MutationObserver(() => {
+    initTanggalFilterKartuStok();
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  window.filterKartuStokByTanggal = filterKartuStokByTanggal;
+  window.resetFilterTanggalKartuStok = resetFilterTanggalKartuStok;
+})();
 </script>
 </body>
 </html>
