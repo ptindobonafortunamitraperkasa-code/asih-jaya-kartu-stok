@@ -1013,7 +1013,7 @@
       document.getElementById('riwayatOpnameWrap').innerHTML = html;
     }
 
-  async function importBarangCSV() {
+ async function importBarangCSV() {
   if (!isAdmin()) return setDebug('Hanya admin yang bisa import data barang.', true);
 
   const fileInput = document.getElementById('import_barang_file');
@@ -1033,6 +1033,7 @@
   }
 
   const rows = [];
+
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(',').map(x => x.replace(/^"|"$/g, '').trim());
 
@@ -1049,27 +1050,27 @@
     };
 
     if (!row.kode_barang && !row.nama_barang) continue;
+
     rows.push(row);
   }
 
-  const validRows = rows.filter(r => r.nama_barang && r.kode_barang);
-
-  if (validRows.length === 0) {
+  if (rows.length === 0) {
     setDebug('Tidak ada data barang valid untuk diimport.', true);
     return;
   }
 
   const { error } = await client
     .from('products')
-    .upsert(validRows, { onConflict: 'kode_barang' });
+    .upsert(rows, { onConflict: 'kode_barang' });
 
   if (error) {
-    setDebug('Gagal import/update: ' + error.message, true);
+    setDebug('Gagal import: ' + error.message, true);
     return;
   }
 
-  setDebug('Import data barang berhasil: ' + validRows.length + ' item');
+  setDebug('Import berhasil: ' + rows.length + ' data');
   fileInput.value = '';
+
   await loadProducts();
   await loadTransactions();
   await loadOpnames();
