@@ -665,38 +665,64 @@
         return cocokCari && cocokLokasi;
       });
     }
+function renderProductsTable() {
+  const rows = getFilteredProducts();
+  const wrap = document.getElementById('productsTableWrap');
 
-    function renderProductsTable() {
-      const rows = getFilteredProducts();
+  if (!wrap) return;
 
-      let html = '<table><tr><th>Kode</th><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Letak</th><th>Stok Awal</th><th>Stok Minimum</th><th>Stok Saat Ini</th><th>Status Stok</th><th>Status Data</th>';
-      if (isAdmin()) html += '<th>Aksi</th>';
-      html += '</tr>';
+  if (!rows.length) {
+    wrap.innerHTML = `<p>Tidak ada data barang</p>`;
+    return;
+  }
 
-      rows.forEach(item => {
-        const st = statusStok(item);
-        html += `<tr>
-          <td>${item.kode_barang || ''}</td>
-          <td>${item.nama_barang || ''}</td>
-          <td>${item.gudang || ''}</td>
-          <td>${item.lokasi || ''}</td>
-          <td>${item.letak_barang || ''}</td>
-          <td>${item.stok_awal || 0}</td>
-          <td>${item.stok_minimum || 0}</td>
-          <td>${hitungStokBarang(item.id)}</td>
-          <td class="${st.cls}">${st.text}</td>
-          <td>${item.status || ''}</td>`;
-        if (isAdmin()) {
-          html += `<td>
+  let html = `
+  <div style="overflow-x:auto;">
+    <table>
+      <tr>
+        <th>Kode</th>
+        <th>Nama Barang</th>
+        <th>Barcode</th>
+        <th>Gudang</th>
+        <th>Lokasi</th>
+        <th>Letak</th>
+        <th>Stok Awal</th>
+        <th>Stok Minimum</th>
+        <th>Stok Saat Ini</th>
+        <th>Status</th>
+        ${isAdmin() ? '<th>Aksi</th>' : ''}
+      </tr>
+  `;
+
+  rows.forEach(item => {
+    const st = statusStok(item);
+
+    html += `
+      <tr>
+        <td>${item.kode_barang || item.sku || '-'}</td>
+        <td>${item.nama_barang || item.name || '-'}</td>
+        <td>${item.barcode || '-'}</td>
+        <td>${item.gudang || '-'}</td>
+        <td>${item.lokasi || '-'}</td>
+        <td>${item.letak_barang || '-'}</td>
+        <td>${item.stok_awal || 0}</td>
+        <td>${item.stok_minimum || 0}</td>
+        <td>${hitungStokBarang(item.id)}</td>
+        <td class="${st.cls}">${st.text}</td>
+        ${isAdmin() ? `
+          <td>
             <button class="btn warning" onclick="editBarang('${item.id}')">Edit</button>
             <button class="btn danger" onclick="hapusBarang('${item.id}')">Hapus</button>
-          </td>`;
-        }
-        html += '</tr>';
-      });
-      html += '</table>';
-      document.getElementById('productsTableWrap').innerHTML = html;
-    }
+          </td>
+        ` : ''}
+      </tr>
+    `;
+  });
+
+  html += `</table></div>`;
+
+  wrap.innerHTML = html;
+}
 
     function renderKartuStok() {
       const fNama = (document.getElementById('filter_kartu_nama').value || '').toLowerCase();
