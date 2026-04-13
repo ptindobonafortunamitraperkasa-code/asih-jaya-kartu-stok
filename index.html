@@ -1056,13 +1056,14 @@
         return;
       }
 
-      const { error } = await client.from('products').insert(validRows);
+     const { error } = await client
+  .from('products')
+  .upsert(rows, { onConflict: 'kode_barang' });
 
-      if (error) {
-        setDebug('Gagal import barang: ' + error.message, true);
-        return;
-      }
-
+if (error) {
+  setDebug('Gagal import/update: ' + error.message, true);
+  return;
+}
       setDebug('Import data barang berhasil: ' + validRows.length + ' item');
       fileInput.value = '';
       await loadProducts();
