@@ -1,6 +1,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -522,109 +523,32 @@
       renderDashboard();
       setDebug('Semua data berhasil di-refresh.');
     }
+async function loadProducts() {
+  const { data, error } = await client.from('products').select('*');
 
-    async function loadProducts() {
-      const { data, error } = await client.from('products').select('*').order('created_at', { ascending: false });
-      if (error) return setDebug('Gagal load products: ' + error.message, true);
-      productsData = data || [];
-      document.getElementById('barang_kode').value = generateKodeBarang();
-      isiDropdownBarangMasuk();
-      isiDropdownBarangKeluar();
-      renderProductsTable();
-    }
+  if (error) {
+    console.error(error);
+    return;
+  }
 
-    async function loadTransactions() {
-      const { data, error } = await client.from('stock_transactions').select('*').order('tanggal', { ascending: false });
-      if (error) return setDebug('Gagal load transaksi: ' + error.message, true);
-      transactionsData = data || [];
-      renderKartuStok();
-      renderProductsTable();
-    }
+  productsData = (data || []).map(item => ({
+    ...item,
+    kode_barang: item.kode_barang || item.kode || '',
+    nama_barang: item.nama_barang || item.nama || '',
+    barcode: item.barcode || '',
+    stok_awal: Number(item.stok_awal ?? item.stok ?? 0),
+    gudang: item.gudang || '',
+    lokasi: item.lokasi || '',
+    letak_barang: item.letak_barang || item.letak || '',
+    stok_minimum: Number(item.stok_minimum ?? 0),
+    status: item.status || 'aktif'
+  }));
 
-    async function loadOpnames() {
-      const { data, error } = await client.from('stock_opnames').select('*').order('created_at', { ascending: false });
-      if (error) return setDebug('Gagal load opname: ' + error.message, true);
-      opnamesData = data || [];
-      await renderRiwayatOpname();
-    }
-
-    function hitungStokBarang(productId) {
-      const barang = productsData.find(x => x.id === productId);
-      const stokAwal = Number(barang?.stok_awal || 0);
-      let masuk = 0;
-      let keluar = 0;
-      transactionsData.forEach(trx => {
-        if (trx.product_id === productId) {
-          if (trx.jenis_transaksi === 'masuk') masuk += Number(trx.jumlah || 0);
-          if (trx.jenis_transaksi === 'keluar') keluar += Number(trx.jumlah || 0);
-        }
-      });
-      return stokAwal + masuk - keluar;
-    }
-
-    function statusStok(item) {
-      const stok = hitungStokBarang(item.id);
-      const min = Number(item.stok_minimum || 0);
-      if (stok <= 0) return { text: 'Wajib Order', cls: 'status-bad' };
-      if (min > 0 && stok <= min) return { text: 'Menipis', cls: 'status-warn' };
-      return { text: 'Aman', cls: 'status-ok' };
-    }
-
-    function renderDashboard() {
-      document.getElementById('dash_total_barang').textContent = productsData.length;
-      document.getElementById('dash_total_stok').textContent = productsData.reduce((a, b) => a + hitungStokBarang(b.id), 0);
-      document.getElementById('dash_stok_menipis').textContent = productsData.filter(x => statusStok(x).text === 'Menipis').length;
-      document.getElementById('dash_wajib_order').textContent = productsData.filter(x => statusStok(x).text === 'Wajib Order').length;
-
-      let notif = '<div class="card"><b>Notifikasi Stok</b>';
-      const list = productsData.filter(x => ['Menipis', 'Wajib Order'].includes(statusStok(x).text));
-      if (list.length === 0) {
-        notif += '<p class="status-ok">Tidak ada stok kritis.</p>';
-      } else {
-        notif += '<table><tr><th>Barang</th><th>Gudang</th><th>Lokasi</th><th>Stok</th><th>Minimum</th><th>Status</th></tr>';
-        list.forEach(item => {
-          const st = statusStok(item);
-          notif += `<tr>
-            <td>${item.nama_barang}</td>
-            <td>${item.gudang || ''}</td>
-            <td>${item.lokasi || ''}</td>
-            <td>${hitungStokBarang(item.id)}</td>
-            <td>${item.stok_minimum || 0}</td>
-            <td class="${st.cls}">${st.text}</td>
-          </tr>`;
-        });
-        notif += '</table>';
-      }
-      notif += '</div>';
-      document.getElementById('dashboardNotif').innerHTML = notif;
-    }
-
-    function isiDropdownBarangMasuk() {
-      const q = (document.getElementById('search_masuk').value || '').toLowerCase();
-      const select = document.getElementById('masuk_product');
-      select.innerHTML = '';
-      productsData
-        .filter(item => !q || (item.nama_barang || '').toLowerCase().includes(q) || (item.kode_barang || '').toLowerCase().includes(q))
-        .forEach(item => {
-          const opt = document.createElement('option');
-          opt.value = item.id;
-          opt.textContent = `${item.nama_barang} | ${item.gudang || '-'} | ${item.lokasi || '-'} | ${item.letak_barang || '-'}`;
-          select.appendChild(opt);
-        });
-    }
-
-    function isiDropdownBarangKeluar() {
-      const q = (document.getElementById('search_keluar').value || '').toLowerCase();
-      const select = document.getElementById('keluar_product');
-      select.innerHTML = '';
-      productsData
-        .filter(item => !q || (item.nama_barang || '').toLowerCase().includes(q) || (item.kode_barang || '').toLowerCase().includes(q))
-        .forEach(item => {
-          const opt = document.createElement('option');
-          opt.value = item.id;
-          opt.textContent = `${item.nama_barang} | ${item.gudang || '-'} | ${item.lokasi || '-'} | ${item.letak_barang || '-'}`;
-          select.appendChild(opt);
-        });
+  renderProductsTable();
+  renderDashboard();
+  isiDropdownBarangMasuk();
+  isiDropdownBarangKeluar();
+}
     }
 
     function getFilteredProducts() {
@@ -644,7 +568,7 @@
     }
 
     function renderProductsTable() {
-      const rows = getFilteredProducts();
+   const rows = getFilteredProducts().filter(item => item.nama_barang);
 
       let html = '<table><tr><th>Kode</th><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Letak</th><th>Stok Awal</th><th>Stok Minimum</th><th>Stok Saat Ini</th><th>Status Stok</th><th>Status Data</th>';
       if (isAdmin()) html += '<th>Aksi</th>';
@@ -1013,1197 +937,96 @@
       document.getElementById('riwayatOpnameWrap').innerHTML = html;
     }
 
-    async function importBarangCSV() {
-      if (!isAdmin()) return setDebug('Hanya admin yang bisa import data barang.', true);
 
-      const fileInput = document.getElementById('import_barang_file');
-      const file = fileInput.files[0];
-
-      if (!file) {
-        setDebug('Pilih file CSV dulu.', true);
-        return;
-      }
-
-      const text = await file.text();
-      const lines = text.split('\n').map(x => x.trim()).filter(x => x);
-
-      if (lines.length < 2) {
-        setDebug('File CSV kosong atau tidak valid.', true);
-        return;
-      }
-
-      const rows = [];
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',').map(x => x.replace(/^"|"$/g, '').trim());
-
-        rows.push({
-          kode_barang: cols[0] || ('ASH' + String(productsData.length + i).padStart(3, '0')),
-          nama_barang: cols[1] || '',
-          barcode: cols[2] || '',
-          stok_awal: Number(cols[3] || 0),
-          gudang: cols[4] || '',
-          lokasi: cols[5] || '',
-          letak_barang: cols[6] || '',
-          status: cols[7] || 'aktif',
-          stok_minimum: Number(cols[8] || 0)
-        });
-      }
-
-      const validRows = rows.filter(r => r.nama_barang);
-
-      if (validRows.length === 0) {
-        setDebug('Tidak ada data barang valid untuk diimport.', true);
-        return;
-      }
-
-      const { error } = await client.from('products').insert(validRows);
-
-      if (error) {
-        setDebug('Gagal import barang: ' + error.message, true);
-        return;
-      }
-
-      setDebug('Import data barang berhasil: ' + validRows.length + ' item');
-      fileInput.value = '';
-      await loadProducts();
-      await loadTransactions();
-      renderDashboard();
-    }
-
-    function downloadCSV(filename, rows) {
-      const csvContent = rows.map(row =>
-        row.map(value => {
-          const text = String(value ?? '').replace(/"/g, '""');
-          return `"${text}"`;
-        }).join(',')
-      ).join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', filename);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
-    function openPrintWindow(title, htmlContent) {
-      const win = window.open('', '', 'width=1200,height=800');
-      win.document.write(`
-        <html>
-          <head>
-            <title>${title}</title>
-            <style>
-              body { font-family: Arial, sans-serif; padding: 20px; }
-              table { width: 100%; border-collapse: collapse; }
-              th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 12px; }
-              th { background: #f3f4f6; }
-              h2 { margin-bottom: 16px; }
-            </style>
-          </head>
-          <body>
-            <h2>${title}</h2>
-            ${htmlContent}
-          </body>
-        </html>
-      `);
-      win.document.close();
-      win.print();
-    }
-
-    function buildStokRows(data) {
-      const rows = [[
-        'Kode Barang',
-        'Nama Barang',
-        'Gudang',
-        'Lokasi',
-        'Letak Barang',
-        'Stok Awal',
-        'Stok Minimum',
-        'Stok Saat Ini',
-        'Status Stok',
-        'Status Data'
-      ]];
-
-      data.forEach(item => {
-        const st = statusStok(item);
-        rows.push([
-          item.kode_barang || '',
-          item.nama_barang || '',
-          item.gudang || '',
-          item.lokasi || '',
-          item.letak_barang || '',
-          item.stok_awal || 0,
-          item.stok_minimum || 0,
-          hitungStokBarang(item.id),
-          st.text,
-          item.status || ''
-        ]);
-      });
-
-      return rows;
-    }
-
-    function renderStokTableForPrint(data) {
-      let html = `
-        <table>
-          <tr>
-            <th>Kode Barang</th>
-            <th>Nama Barang</th>
-            <th>Gudang</th>
-            <th>Lokasi</th>
-            <th>Letak Barang</th>
-            <th>Stok Awal</th>
-            <th>Stok Minimum</th>
-            <th>Stok Saat Ini</th>
-            <th>Status Stok</th>
-            <th>Status Data</th>
-          </tr>
-      `;
-
-      data.forEach(item => {
-        const st = statusStok(item);
-        html += `
-          <tr>
-            <td>${item.kode_barang || ''}</td>
-            <td>${item.nama_barang || ''}</td>
-            <td>${item.gudang || ''}</td>
-            <td>${item.lokasi || ''}</td>
-            <td>${item.letak_barang || ''}</td>
-            <td>${item.stok_awal || 0}</td>
-            <td>${item.stok_minimum || 0}</td>
-            <td>${hitungStokBarang(item.id)}</td>
-            <td>${st.text}</td>
-            <td>${item.status || ''}</td>
-          </tr>
-        `;
-      });
-
-      html += `</table>`;
-      return html;
-    }
-
-    function exportSemuaStokExcel() {
-      const rows = buildStokRows(productsData);
-      downloadCSV('semua-stok-barang.csv', rows);
-      setDebug('Export semua stok barang ke Excel berhasil');
-    }
-
-    function exportFilterStokExcel() {
-      const filtered = getFilteredProducts();
-      const rows = buildStokRows(filtered);
-      downloadCSV('stok-barang-filter.csv', rows);
-      setDebug('Export stok barang sesuai filter ke Excel berhasil');
-    }
-
-    function exportSemuaStokPDF() {
-      const html = renderStokTableForPrint(productsData);
-      openPrintWindow('Semua Stok Barang', html);
-      setDebug('Export semua stok barang ke PDF berhasil');
-    }
-
-    function exportFilterStokPDF() {
-      const filtered = getFilteredProducts();
-      const html = renderStokTableForPrint(filtered);
-      openPrintWindow('Stok Barang Sesuai Filter', html);
-      setDebug('Export stok barang sesuai filter ke PDF berhasil');
-    }
-
-    function exportBarangMasukExcel() {
-      const rows = [['Tanggal','Kode Barang','Nama Barang','Jumlah','Gudang','Lokasi','Keterangan']];
-      transactionsData
-        .filter(trx => trx.jenis_transaksi === 'masuk')
-        .forEach(trx => {
-          const barang = productsData.find(x => x.id === trx.product_id);
-          rows.push([
-            trx.tanggal || '',
-            barang?.kode_barang || '',
-            barang?.nama_barang || '',
-            trx.jumlah || 0,
-            trx.gudang || '',
-            trx.lokasi || '',
-            trx.keterangan || ''
-          ]);
-        });
-      downloadCSV('barang-masuk.csv', rows);
-      setDebug('Export Excel barang masuk berhasil');
-    }
-
-    function exportBarangKeluarExcel() {
-      const rows = [['Tanggal','Kode Barang','Nama Barang','Jumlah','Gudang','Lokasi','Keterangan']];
-      transactionsData
-        .filter(trx => trx.jenis_transaksi === 'keluar')
-        .forEach(trx => {
-          const barang = productsData.find(x => x.id === trx.product_id);
-          rows.push([
-            trx.tanggal || '',
-            barang?.kode_barang || '',
-            barang?.nama_barang || '',
-            trx.jumlah || 0,
-            trx.gudang || '',
-            trx.lokasi || '',
-            trx.keterangan || ''
-          ]);
-        });
-      downloadCSV('barang-keluar.csv', rows);
-      setDebug('Export Excel barang keluar berhasil');
-    }
-
-    function exportOpnameExcel() {
-      const rows = [['Nama Barang','Gudang','Lokasi','Stok Sistem','Stok Fisik','Selisih','Status','Keterangan','Petugas']];
-      opnamesData.forEach(op => {
-        const barang = productsData.find(x => x.id === op.product_id);
-        rows.push([
-          barang?.nama_barang || '',
-          op.gudang || '',
-          op.lokasi || '',
-          op.stok_sistem || 0,
-          op.stok_fisik || 0,
-          op.selisih || 0,
-          op.status || '',
-          op.keterangan || '',
-          op.petugas_opname || ''
-        ]);
-      });
-      downloadCSV('opname.csv', rows);
-      setDebug('Export Excel opname berhasil');
-    }
-
-    function exportBarangMasukPDF() {
-      const rows = transactionsData.filter(trx => trx.jenis_transaksi === 'masuk');
-      let html = '<table><tr><th>Tanggal</th><th>Kode</th><th>Nama Barang</th><th>Jumlah</th><th>Gudang</th><th>Lokasi</th><th>Keterangan</th></tr>';
-      rows.forEach(trx => {
-        const barang = productsData.find(x => x.id === trx.product_id);
-        html += `<tr>
-          <td>${trx.tanggal || ''}</td>
-          <td>${barang?.kode_barang || ''}</td>
-          <td>${barang?.nama_barang || ''}</td>
-          <td>${trx.jumlah || 0}</td>
-          <td>${trx.gudang || ''}</td>
-          <td>${trx.lokasi || ''}</td>
-          <td>${trx.keterangan || ''}</td>
-        </tr>`;
-      });
-      html += '</table>';
-      openPrintWindow('Barang Masuk', html);
-    }
-
-    function exportBarangKeluarPDF() {
-      const rows = transactionsData.filter(trx => trx.jenis_transaksi === 'keluar');
-      let html = '<table><tr><th>Tanggal</th><th>Kode</th><th>Nama Barang</th><th>Jumlah</th><th>Gudang</th><th>Lokasi</th><th>Keterangan</th></tr>';
-      rows.forEach(trx => {
-        const barang = productsData.find(x => x.id === trx.product_id);
-        html += `<tr>
-          <td>${trx.tanggal || ''}</td>
-          <td>${barang?.kode_barang || ''}</td>
-          <td>${barang?.nama_barang || ''}</td>
-          <td>${trx.jumlah || 0}</td>
-          <td>${trx.gudang || ''}</td>
-          <td>${trx.lokasi || ''}</td>
-          <td>${trx.keterangan || ''}</td>
-        </tr>`;
-      });
-      html += '</table>';
-      openPrintWindow('Barang Keluar', html);
-    }
-
-    function exportOpnamePDF() {
-      let html = '<table><tr><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Stok Sistem</th><th>Stok Fisik</th><th>Selisih</th><th>Status</th><th>Keterangan</th><th>Petugas</th></tr>';
-      opnamesData.forEach(op => {
-        const barang = productsData.find(x => x.id === op.product_id);
-        html += `<tr>
-          <td>${barang?.nama_barang || ''}</td>
-          <td>${op.gudang || ''}</td>
-          <td>${op.lokasi || ''}</td>
-          <td>${op.stok_sistem || 0}</td>
-          <td>${op.stok_fisik || 0}</td>
-          <td>${op.selisih || 0}</td>
-          <td>${op.status || ''}</td>
-          <td>${op.keterangan || ''}</td>
-          <td>${op.petugas_opname || ''}</td>
-        </tr>`;
-      });
-      html += '</table>';
-      openPrintWindow('Opname', html);
-    }
-
-    window.addEventListener('load', cekSession);
-  </script>
-  <script>
-(function () {
-  // ================================
-  // LOAD LIBRARY PDF OTOMATIS
-  // ================================
-  function loadScript(src) {
-    return new Promise((resolve, reject) => {
-      const old = document.querySelector('script[src="' + src + '"]');
-      if (old) return resolve();
-      const s = document.createElement("script");
-      s.src = src;
-      s.onload = resolve;
-      s.onerror = reject;
-      document.head.appendChild(s);
-    });
-  }
-
-  async function ensurePdfLibs() {
-    if (!window.jspdf) {
-      await loadScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js");
-    }
-    if (!window.jspdf || !window.jspdf.jsPDF) {
-      throw new Error("Library jsPDF gagal dimuat");
-    }
-    if (!window.jspdf || !window.jspdf.jsPDF || !(window.jspdf && window.jspdf.jsPDF)) {
-      throw new Error("jsPDF tidak tersedia");
-    }
-    if (!(window.jspdf && window.jspdf.jsPDF) || !window.jspdf) {
-      throw new Error("jsPDF belum aktif");
-    }
-    if (!window.jsPDF && !window.jspdf) {
-      throw new Error("PDF library belum aktif");
-    }
-    if (!window.jspdf || !window.jspdf.jsPDF || !window.jspdf.jsPDF.API) {
-      // lanjut saja, kadang API terpasang setelah plugin
-    }
-    await loadScript("https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js");
-  }
-
-  // ================================
-  // STATE
-  // ================================
-  window.appState = window.appState || {};
-  appState.kartuStok = appState.kartuStok || [];
-
-  // ================================
-  // UTIL
-  // ================================
-  function formatTanggal(value) {
-    if (!value) return "";
-    try {
-      const d = new Date(value);
-      if (isNaN(d.getTime())) return String(value);
-      const dd = String(d.getDate()).padStart(2, "0");
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const yy = d.getFullYear();
-      const hh = String(d.getHours()).padStart(2, "0");
-      const mi = String(d.getMinutes()).padStart(2, "0");
-      return dd + "-" + mm + "-" + yy + " " + hh + ":" + mi;
-    } catch (e) {
-      return String(value);
-    }
-  }
-
-  function escapeHtml(text) {
-    return String(text ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-
-  function ambilDataKartuStok() {
-    const candidates = [
-      appState.kartuStok,
-      appState.stockTransactions,
-      appState.stock_transactions,
-      appState.v_kartu_stok,
-      appState.transactions
-    ];
-    for (const c of candidates) {
-      if (Array.isArray(c) && c.length) return c;
-    }
-    return [];
-  }
-
-  function guessTableBody() {
-    const selectors = [
-      "#kartu-stok-table tbody",
-      "#table-kartu-stok tbody",
-      "#tbl-kartu-stok tbody",
-      "#kartuStokTable tbody",
-      "table tbody"
-    ];
-    for (const sel of selectors) {
-      const el = document.querySelector(sel);
-      if (el) return el;
-    }
-    return null;
-  }
-
-  function ensureToolbar() {
-    if (document.getElementById("toolbar-export-kartu-stok")) return;
-
-    let target =
-      document.querySelector("#kartu-stok") ||
-      document.querySelector("#menu-kartu-stok") ||
-      document.querySelector(".kartu-stok") ||
-      document.querySelector(".menu-kartu-stok") ||
-      guessTableBody()?.closest("table")?.parentElement ||
-      document.body;
-
-    const bar = document.createElement("div");
-    bar.id = "toolbar-export-kartu-stok";
-    bar.style.display = "flex";
-    bar.style.gap = "10px";
-    bar.style.flexWrap = "wrap";
-    bar.style.marginBottom = "12px";
-    bar.innerHTML = `
-      <button type="button" id="btn-pilih-semua-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#334155; color:#fff; font-weight:700; cursor:pointer;">
-        Pilih Semua
-      </button>
-      <button type="button" id="btn-batal-pilih-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#64748b; color:#fff; font-weight:700; cursor:pointer;">
-        Batal Pilih
-      </button>
-      <button type="button" id="btn-export-pdf-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#16a34a; color:#fff; font-weight:700; cursor:pointer;">
-        Export PDF
-      </button>
-    `;
-
-    if (target.firstChild) {
-      target.insertBefore(bar, target.firstChild);
-    } else {
-      target.appendChild(bar);
-    }
-
-    document.getElementById("btn-pilih-semua-kartu-stok").onclick = pilihSemuaKartuStok;
-    document.getElementById("btn-batal-pilih-kartu-stok").onclick = batalPilihKartuStok;
-    document.getElementById("btn-export-pdf-kartu-stok").onclick = exportKartuStokPDF;
-  }
-
-  function ensureCheckboxColumn() {
-    const tbody = guessTableBody();
-    if (!tbody) return;
-
-    const table = tbody.closest("table");
-    if (!table) return;
-
-    const theadRow = table.querySelector("thead tr");
-    if (theadRow && !theadRow.querySelector(".th-pilih-kartu-stok")) {
-      const th = document.createElement("th");
-      th.className = "th-pilih-kartu-stok";
-      th.textContent = "Pilih";
-      theadRow.insertBefore(th, theadRow.firstChild);
-    }
-
-    const rows = tbody.querySelectorAll("tr");
-    rows.forEach((tr, idx) => {
-      if (tr.querySelector(".pilih-kartu-stok")) return;
-      const data = ambilDataKartuStok();
-      const rowData = data[idx] || {};
-      const id = rowData.id || ("row_" + idx);
-
-      const td = document.createElement("td");
-      td.innerHTML = '<input type="checkbox" class="pilih-kartu-stok" value="' + escapeHtml(id) + '">';
-      tr.insertBefore(td, tr.firstChild);
-    });
-  }
-
-  function syncCheckboxWithData() {
-    const tbody = guessTableBody();
-    if (!tbody) return;
-    const rows = tbody.querySelectorAll("tr");
-    const data = ambilDataKartuStok();
-
-    rows.forEach((tr, idx) => {
-      const cb = tr.querySelector(".pilih-kartu-stok");
-      if (!cb) return;
-      const rowData = data[idx] || {};
-      cb.value = rowData.id || ("row_" + idx);
-    });
-  }
-
-  function getSelectedRows() {
-    const data = ambilDataKartuStok();
-    const selected = [...document.querySelectorAll(".pilih-kartu-stok:checked")].map(x => String(x.value));
-
-    if (!selected.length) return data;
-
-    return data.filter((row, idx) => {
-      const id = row.id || ("row_" + idx);
-      return selected.includes(String(id));
-    });
-  }
-
-  // ================================
-  // ACTIONS
-  // ================================
-  window.pilihSemuaKartuStok = function () {
-    document.querySelectorAll(".pilih-kartu-stok").forEach(el => el.checked = true);
-  };
-
-  window.batalPilihKartuStok = function () {
-    document.querySelectorAll(".pilih-kartu-stok").forEach(el => el.checked = false);
-  };
-
-  window.exportKartuStokPDF = async function () {
-    try {
-      await ensurePdfLibs();
-
-      const rows = getSelectedRows();
-      if (!rows.length) {
-        alert("Data kartu stok tidak ada.");
-        return;
-      }
-
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF("l", "mm", "a4");
-
-      const body = rows.map((row, i) => [
-        i + 1,
-        formatTanggal(row.created_at || row.tanggal || row.transaction_date || row.date || ""),
-        row.kode || row.kode_barang || row.product_code || "",
-        row.nama || row.nama_barang || row.product_name || "",
-        row.gudang || row.warehouse || "",
-        row.lokasi || row.rak || row.location || "",
-        row.letak || row.bin || "",
-        row.jenis || row.tipe || row.transaction_type || "",
-        Number(row.masuk || row.qty_masuk || row.in_qty || 0),
-        Number(row.keluar || row.qty_keluar || row.out_qty || 0),
-        Number(row.saldo || row.stok || row.balance || 0),
-        row.keterangan || row.note || ""
-      ]);
-
-      doc.setFontSize(14);
-      doc.text("Laporan Kartu Stok", 14, 12);
-
-      doc.setFontSize(9);
-      doc.text("Export: semua data atau item yang dicentang", 14, 18);
-
-      doc.autoTable({
-        startY: 22,
-        head: [[
-          "No",
-          "Tanggal",
-          "Kode",
-          "Nama Barang",
-          "Gudang",
-          "Lokasi",
-          "Letak",
-          "Jenis",
-          "Masuk",
-          "Keluar",
-          "Saldo",
-          "Keterangan"
-        ]],
-        body: body,
-        styles: {
-          fontSize: 7,
-          cellPadding: 2
-        },
-        margin: {
-          top: 22,
-          right: 8,
-          bottom: 10,
-          left: 8
-        }
-      });
-
-      doc.save("kartu_stok.pdf");
-    } catch (err) {
-      console.error(err);
-      alert("Gagal export PDF: " + err.message);
-    }
-  };
-
-  // ================================
-  // PATCH LOAD DATA
-  // ================================
-  const oldLoadAllData = window.loadAllData;
-  window.loadAllData = async function () {
-    if (typeof oldLoadAllData === "function") {
-      await oldLoadAllData();
-    }
-
-    try {
-      if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
-        let res = await fetch(`${SUPABASE_URL}/rest/v1/v_kartu_stok?select=*`, {
-          headers: {
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`
-          }
-        });
-
-        if (!res.ok) {
-          res = await fetch(`${SUPABASE_URL}/rest/v1/stock_transactions?select=*`, {
-            headers: {
-              apikey: SUPABASE_ANON_KEY,
-              Authorization: `Bearer ${SUPABASE_ANON_KEY}`
-            }
-          });
-        }
-
-        if (res.ok) {
-          const data = await res.json();
-          appState.kartuStok = Array.isArray(data) ? data : [];
-        }
-      }
-    } catch (e) {
-      console.warn("Load kartu stok gagal:", e);
-    }
-
-    setTimeout(() => {
-      ensureToolbar();
-      ensureCheckboxColumn();
-      syncCheckboxWithData();
-    }, 300);
-  };
-
-  // ================================
-  // INIT
-  // ================================
-  document.addEventListener("DOMContentLoaded", function () {
-    ensureToolbar();
-    setTimeout(() => {
-      ensureCheckboxColumn();
-      syncCheckboxWithData();
-    }, 500);
-
-    if (typeof window.loadAllData === "function") {
-      window.loadAllData();
-    }
+  function exportOpnamePDF() {
+  let html = '<table><tr><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Stok Sistem</th><th>Stok Fisik</th><th>Selisih</th><th>Status</th><th>Keterangan</th><th>Petugas</th></tr>';
+  opnamesData.forEach(op => {
+    const barang = productsData.find(x => x.id === op.product_id);
+    html += `<tr>
+      <td>${barang?.nama_barang || ''}</td>
+      <td>${op.gudang || ''}</td>
+      <td>${op.lokasi || ''}</td>
+      <td>${op.stok_sistem || 0}</td>
+      <td>${op.stok_fisik || 0}</td>
+      <td>${op.selisih || 0}</td>
+      <td>${op.status || ''}</td>
+      <td>${op.keterangan || ''}</td>
+      <td>${op.petugas_opname || ''}</td>
+    </tr>`;
   });
+  html += '</table>';
+  openPrintWindow('Opname', html);
+}
 
-  const observer = new MutationObserver(() => {
-    ensureToolbar();
-    ensureCheckboxColumn();
-    syncCheckboxWithData();
-  });
-
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
-})();
-</script>
-  <script>
-(function () {
-  function loadScript(src) {
-    return new Promise((resolve, reject) => {
-      if (document.querySelector('script[src="' + src + '"]')) return resolve();
-      const s = document.createElement("script");
-      s.src = src;
-      s.onload = resolve;
-      s.onerror = reject;
-      document.head.appendChild(s);
-    });
-  }
-
-  async function ensureExportLibs() {
-    if (!window.jspdf) {
-      await loadScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js");
-    }
-    if (!window.XLSX) {
-      await loadScript("https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js");
-    }
-    await loadScript("https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js");
-  }
-
-  function formatTanggal(value) {
-    if (!value) return "";
-    try {
-      const d = new Date(value);
-      if (isNaN(d.getTime())) return String(value);
-      const dd = String(d.getDate()).padStart(2, "0");
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const yy = d.getFullYear();
-      const hh = String(d.getHours()).padStart(2, "0");
-      const mi = String(d.getMinutes()).padStart(2, "0");
-      return `${dd}-${mm}-${yy} ${hh}:${mi}`;
-    } catch {
-      return String(value);
-    }
-  }
-
-  function getKartuStokTable() {
-    const tables = Array.from(document.querySelectorAll("table"));
-    for (const table of tables) {
-      const text = table.innerText.toLowerCase();
-      if (
-        text.includes("nama barang") &&
-        text.includes("saldo akhir") &&
-        text.includes("gudang")
-      ) {
-        return table;
-      }
-    }
-    return null;
-  }
-
-  function ensureToolbar() {
-    if (document.getElementById("toolbar-export-kartu-stok")) return;
-
-    const table = getKartuStokTable();
-    if (!table) return;
-
-    const wrap = document.createElement("div");
-    wrap.id = "toolbar-export-kartu-stok";
-    wrap.style.display = "flex";
-    wrap.style.gap = "10px";
-    wrap.style.flexWrap = "wrap";
-    wrap.style.margin = "12px 0";
-
-    wrap.innerHTML = `
-      <button type="button" id="btn-pilih-semua-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#334155; color:#fff; font-weight:700; cursor:pointer;">Pilih Semua</button>
-      <button type="button" id="btn-batal-pilih-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#64748b; color:#fff; font-weight:700; cursor:pointer;">Batal Pilih</button>
-      <button type="button" id="btn-export-excel-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#0f766e; color:#fff; font-weight:700; cursor:pointer;">Export Excel</button>
-      <button type="button" id="btn-export-pdf-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#16a34a; color:#fff; font-weight:700; cursor:pointer;">Export PDF</button>
-    `;
-
-    table.parentElement.insertBefore(wrap, table);
-
-    document.getElementById("btn-pilih-semua-kartu-stok").onclick = pilihSemuaKartuStok;
-    document.getElementById("btn-batal-pilih-kartu-stok").onclick = batalPilihKartuStok;
-    document.getElementById("btn-export-excel-kartu-stok").onclick = exportKartuStokExcel;
-    document.getElementById("btn-export-pdf-kartu-stok").onclick = exportKartuStokPDF;
-  }
-
-  function ensureCheckboxColumn() {
-    const table = getKartuStokTable();
-    if (!table) return;
-
-    const theadRow = table.querySelector("thead tr");
-    if (theadRow && !theadRow.querySelector(".th-pilih-kartu-stok")) {
-      const th = document.createElement("th");
-      th.className = "th-pilih-kartu-stok";
-      th.textContent = "Pilih";
-      theadRow.insertBefore(th, theadRow.firstChild);
+async function importBarangCSV() {
+  try {
+    if (!isAdmin()) {
+      alert('Hanya admin yang bisa import');
+      return;
     }
 
-    const rows = table.querySelectorAll("tbody tr");
-    rows.forEach((tr, idx) => {
-      if (tr.querySelector(".pilih-kartu-stok")) return;
+    const fileInput = document.getElementById('import_barang_file');
+    const file = fileInput && fileInput.files ? fileInput.files[0] : null;
 
-      const td = document.createElement("td");
-      td.innerHTML = `<input type="checkbox" class="pilih-kartu-stok" data-row="${idx}">`;
-      tr.insertBefore(td, tr.firstChild);
-    });
-  }
-
-  function pilihSemuaKartuStok() {
-    document.querySelectorAll(".pilih-kartu-stok").forEach(el => el.checked = true);
-  }
-
-  function batalPilihKartuStok() {
-    document.querySelectorAll(".pilih-kartu-stok").forEach(el => el.checked = false);
-  }
-
-  function getVisibleTableRows() {
-    const table = getKartuStokTable();
-    if (!table) return [];
-
-    const rows = Array.from(table.querySelectorAll("tbody tr"));
-    return rows.filter(tr => tr.style.display !== "none");
-  }
-
-  function extractRowsForExport() {
-    const allRows = getVisibleTableRows();
-    if (!allRows.length) return [];
-
-    const checked = allRows.filter(tr => {
-      const cb = tr.querySelector(".pilih-kartu-stok");
-      return cb && cb.checked;
-    });
-
-    const targetRows = checked.length ? checked : allRows;
-
-    return targetRows.map((tr, i) => {
-      const tds = tr.querySelectorAll("td");
-      const start = tr.querySelector(".pilih-kartu-stok") ? 1 : 0;
-
-      return {
-        no: i + 1,
-        tanggal: formatTanggal(tds[start + 0]?.innerText.trim() || ""),
-        kode: tds[start + 1]?.innerText.trim() || "",
-        nama_barang: tds[start + 2]?.innerText.trim() || "",
-        masuk: tds[start + 3]?.innerText.trim() || "",
-        keluar: tds[start + 4]?.innerText.trim() || "",
-        saldo_akhir: tds[start + 5]?.innerText.trim() || "",
-        gudang: tds[start + 6]?.innerText.trim() || "",
-        lokasi: tds[start + 7]?.innerText.trim() || "",
-        keterangan: tds[start + 8]?.innerText.trim() || ""
-      };
-    });
-  }
-
-  async function exportKartuStokExcel() {
-    try {
-      await ensureExportLibs();
-
-      const rows = extractRowsForExport();
-      if (!rows.length) {
-        alert("Data kartu stok tidak ada.");
-        return;
-      }
-
-      const data = rows.map(x => ({
-        No: x.no,
-        Tanggal: x.tanggal,
-        Kode: x.kode,
-        "Nama Barang": x.nama_barang,
-        Masuk: x.masuk,
-        Keluar: x.keluar,
-        "Saldo Akhir": x.saldo_akhir,
-        Gudang: x.gudang,
-        Lokasi: x.lokasi,
-        Keterangan: x.keterangan
-      }));
-
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Kartu Stok");
-      XLSX.writeFile(wb, "kartu_stok.xlsx");
-    } catch (err) {
-      console.error(err);
-      alert("Gagal export Excel: " + err.message);
+    if (!file) {
+      alert('Pilih file CSV dulu');
+      return;
     }
-  }
 
-  async function exportKartuStokPDF() {
-    try {
-      await ensureExportLibs();
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
 
-      const rows = extractRowsForExport();
-      if (!rows.length) {
-        alert("Data kartu stok tidak ada.");
-        return;
-      }
+    if (lines.length < 2) {
+      alert('CSV kosong / tidak valid');
+      return;
+    }
 
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF("l", "mm", "a4");
+    const delimiter = lines[0].includes(';') ? ';' : ',';
+    const dataInsert = [];
 
-      doc.setFontSize(14);
-      doc.text("Laporan Kartu Stok", 14, 12);
+    for (let i = 1; i < lines.length; i++) {
+ if (!cols[0] || !cols[1]) continue;
 
-      doc.setFontSize(9);
-      doc.text("Data: semua baris tampil atau item yang dicentang", 14, 18);
+      if (!cols[0] || !cols[1]) continue;
 
-      doc.autoTable({
-        startY: 22,
-        head: [[
-          "No", "Tanggal", "Kode", "Nama Barang", "Masuk", "Keluar",
-          "Saldo Akhir", "Gudang", "Lokasi", "Keterangan"
-        ]],
-        body: rows.map(x => [
-          x.no,
-          x.tanggal,
-          x.kode,
-          x.nama_barang,
-          x.masuk,
-          x.keluar,
-          x.saldo_akhir,
-          x.gudang,
-          x.lokasi,
-          x.keterangan
-        ]),
-        styles: {
-          fontSize: 8,
-          cellPadding: 2
-        },
-        margin: {
-          top: 22,
-          right: 8,
-          bottom: 10,
-          left: 8
-        }
+      dataInsert.push({
+        kode_barang: cols[0],
+        nama_barang: cols[1],
+        barcode: cols[2] || '',
+        stok_awal: Number(cols[3] || 0),
+        gudang: cols[4] || '',
+        lokasi: cols[5] || '',
+        letak_barang: cols[6] || '',
+        stok_minimum: Number(cols[7] || 0),
+        status: cols[8] || 'aktif'
       });
-
-      doc.save("kartu_stok.pdf");
-    } catch (err) {
-      console.error(err);
-      alert("Gagal export PDF: " + err.message);
-    }
-  }
-
-  function initExportKartuStok() {
-    ensureToolbar();
-    ensureCheckboxColumn();
-  }
-
-  document.addEventListener("DOMContentLoaded", function () {
-    setTimeout(initExportKartuStok, 500);
-  });
-
-  const observer = new MutationObserver(() => {
-    initExportKartuStok();
-  });
-
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
-
-  window.pilihSemuaKartuStok = pilihSemuaKartuStok;
-  window.batalPilihKartuStok = batalPilihKartuStok;
-  window.exportKartuStokExcel = exportKartuStokExcel;
-  window.exportKartuStokPDF = exportKartuStokPDF;
-})();
-</script
-  <script>
-(function () {
-  function loadScript(src) {
-    return new Promise((resolve, reject) => {
-      if (document.querySelector('script[src="' + src + '"]')) return resolve();
-      const s = document.createElement("script");
-      s.src = src;
-      s.onload = resolve;
-      s.onerror = reject;
-      document.head.appendChild(s);
-    });
-  }
-
-  async function ensureExportLibs() {
-    if (!window.jspdf) {
-      await loadScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js");
-    }
-    if (!window.XLSX) {
-      await loadScript("https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js");
-    }
-    await loadScript("https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js");
-  }
-
-  function getKartuStokTable() {
-    if (document.querySelector("#kartu-stok-table")) {
-      return document.querySelector("#kartu-stok-table");
     }
 
-    const tables = Array.from(document.querySelectorAll("table"));
-    for (const table of tables) {
-      const heads = Array.from(table.querySelectorAll("thead th")).map(th => th.innerText.trim().toLowerCase());
-      const joined = heads.join("|");
-      if (
-        joined.includes("tanggal") &&
-        joined.includes("nama barang") &&
-        joined.includes("saldo akhir")
-      ) {
-        return table;
-      }
-    }
-    return null;
-  }
-
-  function ensureToolbar() {
-    if (document.getElementById("toolbar-export-kartu-stok")) return;
-
-    const table = getKartuStokTable();
-    if (!table) return;
-
-    const wrap = document.createElement("div");
-    wrap.id = "toolbar-export-kartu-stok";
-    wrap.style.display = "flex";
-    wrap.style.gap = "10px";
-    wrap.style.flexWrap = "wrap";
-    wrap.style.margin = "12px 0";
-
-    wrap.innerHTML = `
-      <button type="button" id="btn-pilih-semua-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#334155; color:#fff; font-weight:700; cursor:pointer;">Pilih Semua</button>
-      <button type="button" id="btn-batal-pilih-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#64748b; color:#fff; font-weight:700; cursor:pointer;">Batal Pilih</button>
-      <button type="button" id="btn-export-excel-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#0f766e; color:#fff; font-weight:700; cursor:pointer;">Export Excel</button>
-      <button type="button" id="btn-export-pdf-kartu-stok" style="padding:10px 14px; border:none; border-radius:10px; background:#16a34a; color:#fff; font-weight:700; cursor:pointer;">Export PDF</button>
-    `;
-
-    table.parentElement.insertBefore(wrap, table);
-
-    document.getElementById("btn-pilih-semua-kartu-stok").onclick = pilihSemuaKartuStok;
-    document.getElementById("btn-batal-pilih-kartu-stok").onclick = batalPilihKartuStok;
-    document.getElementById("btn-export-excel-kartu-stok").onclick = exportKartuStokExcel;
-    document.getElementById("btn-export-pdf-kartu-stok").onclick = exportKartuStokPDF;
-  }
-
-  function ensureCheckboxColumn() {
-    const table = getKartuStokTable();
-    if (!table) return;
-
-    const theadRow = table.querySelector("thead tr");
-    if (theadRow && !theadRow.querySelector(".th-pilih-kartu-stok")) {
-      const th = document.createElement("th");
-      th.className = "th-pilih-kartu-stok";
-      th.style.width = "40px";
-      th.innerHTML = `<input type="checkbox" id="check-all-kartu-stok" title="Pilih semua">`;
-      theadRow.insertBefore(th, theadRow.firstChild);
-
-      const checkAll = th.querySelector("#check-all-kartu-stok");
-      if (checkAll) {
-        checkAll.addEventListener("change", function () {
-          document.querySelectorAll(".pilih-kartu-stok").forEach(el => {
-            el.checked = this.checked;
-          });
-        });
-      }
+    if (!dataInsert.length) {
+      alert('Tidak ada data valid');
+      return;
     }
 
-    const rows = table.querySelectorAll("tbody tr");
-    rows.forEach((tr, idx) => {
-      if (tr.querySelector(".pilih-kartu-stok")) return;
-      const td = document.createElement("td");
-      td.style.textAlign = "center";
-      td.innerHTML = `<input type="checkbox" class="pilih-kartu-stok" data-row="${idx}">`;
-      tr.insertBefore(td, tr.firstChild);
-    });
-  }
+    const { error } = await client.from('products').insert(dataInsert);
 
-  window.pilihSemuaKartuStok = function () {
-    document.querySelectorAll(".pilih-kartu-stok").forEach(el => el.checked = true);
-    const all = document.getElementById("check-all-kartu-stok");
-    if (all) all.checked = true;
-  };
-
-  window.batalPilihKartuStok = function () {
-    document.querySelectorAll(".pilih-kartu-stok").forEach(el => el.checked = false);
-    const all = document.getElementById("check-all-kartu-stok");
-    if (all) all.checked = false;
-  };
-
-  function getVisibleRows() {
-    const table = getKartuStokTable();
-    if (!table) return [];
-    return Array.from(table.querySelectorAll("tbody tr")).filter(tr => {
-      const style = window.getComputedStyle(tr);
-      return style.display !== "none" && style.visibility !== "hidden";
-    });
-  }
-
-  function ambilText(td) {
-    return (td?.innerText || "").trim();
-  }
-
-  function extractRowsForExport() {
-    const allRows = getVisibleRows();
-    if (!allRows.length) return [];
-
-    const checkedRows = allRows.filter(tr => {
-      const cb = tr.querySelector(".pilih-kartu-stok");
-      return cb && cb.checked;
-    });
-
-    const targetRows = checkedRows.length ? checkedRows : allRows;
-
-    return targetRows.map((tr, i) => {
-      const tds = tr.querySelectorAll("td");
-
-      return {
-        no: i + 1,
-        tanggal: ambilText(tds[1]),
-        kode: ambilText(tds[2]),
-        nama_barang: ambilText(tds[3]),
-        masuk: ambilText(tds[4]),
-        keluar: ambilText(tds[5]),
-        saldo_akhir: ambilText(tds[6]),
-        gudang: ambilText(tds[7]),
-        lokasi: ambilText(tds[8]),
-        keterangan: ambilText(tds[9])
-      };
-    });
-  }
-
-  window.exportKartuStokExcel = async function () {
-    try {
-      await ensureExportLibs();
-
-      const rows = extractRowsForExport();
-      if (!rows.length) {
-        alert("Data kartu stok tidak ada.");
-        return;
-      }
-
-      const data = rows.map(x => ({
-        No: x.no,
-        Tanggal: x.tanggal,
-        Kode: x.kode,
-        "Nama Barang": x.nama_barang,
-        Masuk: x.masuk,
-        Keluar: x.keluar,
-        "Saldo Akhir": x.saldo_akhir,
-        Gudang: x.gudang,
-        Lokasi: x.lokasi,
-        Keterangan: x.keterangan
-      }));
-
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Kartu Stok");
-      XLSX.writeFile(wb, "kartu_stok.xlsx");
-    } catch (err) {
-      console.error(err);
-      alert("Gagal export Excel: " + err.message);
+    if (error) {
+      alert('Gagal import: ' + error.message);
+      return;
     }
-  };
 
-  window.exportKartuStokPDF = async function () {
-    try {
-      await ensureExportLibs();
-
-      const rows = extractRowsForExport();
-      if (!rows.length) {
-        alert("Data kartu stok tidak ada.");
-        return;
-      }
-
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF("l", "mm", "a4");
-
-      doc.setFontSize(14);
-      doc.text("Laporan Kartu Stok", 14, 12);
-
-      doc.setFontSize(9);
-      doc.text("Sumber: data yang tampil di tabel", 14, 18);
-
-      doc.autoTable({
-        startY: 22,
-        head: [[
-          "No", "Tanggal", "Kode", "Nama Barang", "Masuk", "Keluar",
-          "Saldo Akhir", "Gudang", "Lokasi", "Keterangan"
-        ]],
-        body: rows.map(x => [
-          x.no,
-          x.tanggal,
-          x.kode,
-          x.nama_barang,
-          x.masuk,
-          x.keluar,
-          x.saldo_akhir,
-          x.gudang,
-          x.lokasi,
-          x.keterangan
-        ]),
-        styles: {
-          fontSize: 8,
-          cellPadding: 2
-        },
-        margin: {
-          top: 22,
-          right: 8,
-          bottom: 10,
-          left: 8
-        }
-      });
-
-      doc.save("kartu_stok.pdf");
-    } catch (err) {
-      console.error(err);
-      alert("Gagal export PDF: " + err.message);
-    }
-  };
-
-  function initKartuStokExport() {
-    ensureToolbar();
-    ensureCheckboxColumn();
+    alert('Import berhasil: ' + dataInsert.length + ' data');
+    fileInput.value = '';
+    await loadProducts();
+    await loadTransactions();
+    renderDashboard();
+    renderProductsTable();
+  } catch (err) {
+    console.error(err);
+    alert('Error import: ' + err.message);
   }
-
-  document.addEventListener("DOMContentLoaded", function () {
-    setTimeout(initKartuStokExport, 500);
-    setTimeout(initKartuStokExport, 1200);
-  });
-
-  const observer = new MutationObserver(() => {
-    initKartuStokExport();
-  });
-
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
-})();
+}
+}
+window.addEventListener('load', cekSession);
 </script>
 </body>
 </html>
