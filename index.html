@@ -514,43 +514,70 @@
       }
     }
 
-    async function loadSemua() {
-      await Promise.all([loadProducts(), loadTransactions(), loadOpnames()]);
-      renderDashboard();
-      setDebug('Semua data berhasil di-refresh.');
-    }
+ async function loadSemua() {
+  await loadProducts();
+  await loadTransactions();
+  await loadOpnames();
+
+  renderProductsTable();
+  renderKartuStok();
+  renderRiwayatOpname();
+  renderDashboard();
+
+  setDebug('Semua data berhasil di-refresh.');
+}
 async function loadProducts() {
   const { data, error } = await client.from('products').select('*');
 
   if (error) {
-    console.error(error);
+    setDebug('Gagal load products: ' + error.message, true);
     return;
   }
 
-productsData = (data || []).map(item => ({
-  ...item,
-  kode_barang: item.kode_barang || item.kode || '',
-  nama_barang: item.nama_barang || item.nama || '',
-  letak_barang: item.letak_barang || item.letak || '',
-  stok_awal: Number(item.stok_awal ?? item.stok ?? 0),
-  stok_minimum: Number(item.stok_minimum ?? 0),
-  status: item.status || 'aktif'
-}));
+  productsData = (data || []).map(item => ({
+    ...item,
+    id: String(item.id),
+    kode_barang: item.kode_barang || item.kode || '',
+    nama_barang: item.nama_barang || item.nama || '',
+    letak_barang: item.letak_barang || item.letak || '',
+    stok_awal: Number(item.stok_awal ?? item.stok ?? 0),
+    stok_minimum: Number(item.stok_minimum ?? 0),
+    status: item.status || 'aktif'
+  }));
 }
     async function loadTransactions() {
-      const { data, error } = await client.from('stock_transactions').select('*').order('tanggal', { ascending: false });
-      if (error) return setDebug('Gagal load transaksi: ' + error.message, true);
-      transactionsData = data || [];
-      renderKartuStok();
-      renderProductsTable();
-    }
+  const { data, error } = await client
+    .from('stock_transactions')
+    .select('*')
+    .order('tanggal', { ascending: false });
 
-    async function loadOpnames() {
-      const { data, error } = await client.from('stock_opnames').select('*').order('created_at', { ascending: false });
-      if (error) return setDebug('Gagal load opname: ' + error.message, true);
-      opnamesData = data || [];
-      await renderRiwayatOpname();
-    }
+  if (error) {
+    setDebug('Gagal load transaksi: ' + error.message, true);
+    return;
+  }
+
+  transactionsData = (data || []).map(item => ({
+    ...item,
+    product_id: item.product_id != null ? String(item.product_id) : ''
+  }));
+}
+
+   async function loadOpnames() {
+  const { data, error } = await client
+    .from('stock_opnames')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    setDebug('Gagal load opname: ' + error.message, true);
+    return;
+  }
+
+  opnamesData = (data || []).map(item => ({
+    ...item,
+    product_id: item.product_id != null ? String(item.product_id) : ''
+  }));
+}
 
     function hitungStokBarang(productId) {
       const barang = productsData.find(x => x.id === productId);
