@@ -530,17 +530,15 @@ async function loadProducts() {
     return;
   }
 
-  // NORMALISASI FIELD BIAR DASHBOARD BISA BACA
-  productsData = (data || []).map(item => ({
-    ...item,
-
-    // samakan nama field
-    nama: item.nama || item.nama_barang || '',
-    kode: item.kode || item.kode_barang || '',
-
-    // stok
-    stok: item.stok ?? item.stok_awal ?? 0
-  }));
+productsData = (data || []).map(item => ({
+  ...item,
+  kode_barang: item.kode_barang || item.kode || '',
+  nama_barang: item.nama_barang || item.nama || '',
+  letak_barang: item.letak_barang || item.letak || '',
+  stok_awal: Number(item.stok_awal ?? item.stok ?? 0),
+  stok_minimum: Number(item.stok_minimum ?? 0),
+  status: item.status || 'aktif'
+}));
 }
     async function loadTransactions() {
       const { data, error } = await client.from('stock_transactions').select('*').order('tanggal', { ascending: false });
