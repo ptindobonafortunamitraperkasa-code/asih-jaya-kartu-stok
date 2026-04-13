@@ -950,19 +950,21 @@ productsData = (data || []).map(item => ({
 
       if (uploadError) return setDebug('Gagal upload foto opname: ' + uploadError.message, true);
 
-      const payload = {
-        product_id: productId,
-        gudang: barang.gudang || '',
-        lokasi: barang.lokasi || '',
-        stok_sistem: stokSistem,
-        stok_fisik: stokFisik,
-        selisih: selisih,
-        status: status,
-        catatan: status === 'sesuai' ? 'Stok sesuai' : 'Stok tidak sesuai, periksa kembali opname Anda',
-        keterangan: keteranganManual,
-        foto_opname_url: filePath,
-        petugas_opname: currentProfile?.nama || currentUser?.email || ''
-      };
+    const barang = productsData.find(x => x.id === productId);
+
+const payload = {
+  product_id: productId,
+  nama_barang: barang?.nama_barang || barang?.name || '',
+  gudang,
+  lokasi,
+  stok_sistem: stokSistem,
+  stok_fisik: stokFisik,
+  selisih,
+  status,
+  keterangan: keteranganManual,
+  foto_opname_url: filePath,
+  petugas_opname: currentProfile?.nama || currentUser?.email || ''
+};
 
       const { error } = await client.from('stock_opnames').insert([payload]);
       if (error) return setDebug('Gagal simpan opname: ' + error.message, true);
@@ -996,7 +998,7 @@ productsData = (data || []).map(item => ({
       opnamesData.forEach(op => {
         const barang = productsData.find(x => x.id === op.product_id);
         html += `<tr>
-          <td>${barang?.nama_barang || ''}</td>
+<td>${barang?.nama_barang || barang?.name || op.nama_barang || ''}</td>
           <td>${op.gudang || ''}</td>
           <td>${op.lokasi || ''}</td>
           <td>${op.stok_sistem || 0}</td>
