@@ -1,7 +1,3 @@
-
-
-
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -531,17 +527,15 @@ async function loadProducts() {
     return;
   }
 
-  // NORMALISASI FIELD BIAR DASHBOARD BISA BACA
-  productsData = (data || []).map(item => ({
-    ...item,
-
-    // samakan nama field
-    nama: item.nama || item.nama_barang || '',
-    kode: item.kode || item.kode_barang || '',
-
-    // stok
-    stok: item.stok ?? item.stok_awal ?? 0
-  }));
+productsData = (data || []).map(item => ({
+  ...item,
+  kode_barang: item.kode_barang || item.kode || '',
+  nama_barang: item.nama_barang || item.nama || '',
+  letak_barang: item.letak_barang || item.letak || '',
+  stok_awal: Number(item.stok_awal ?? item.stok ?? 0),
+  stok_minimum: Number(item.stok_minimum ?? 0),
+  status: item.status || 'aktif'
+}));
 }
     async function loadTransactions() {
       const { data, error } = await client.from('stock_transactions').select('*').order('tanggal', { ascending: false });
@@ -1023,7 +1017,7 @@ async function loadProducts() {
       document.getElementById('riwayatOpnameWrap').innerHTML = html;
     }
 
- async function importBarangCSV() {
+async function importBarangCSV() {
   if (!isAdmin()) {
     setDebug('Hanya admin yang bisa import data barang.', true);
     return;
@@ -1102,30 +1096,28 @@ async function loadProducts() {
     for (let i = 1; i < lines.length; i++) {
       const cols = parseCSVLine(lines[i], delimiter);
 
-      const kode = getCol(cols, ['kode', 'kode_barang', 'item_code', 'sku']);
+      const kode_barang = getCol(cols, ['kode_barang', 'kode', 'item_code', 'sku']);
       const nama_barang = getCol(cols, ['nama_barang', 'nama', 'nama_item', 'item_name']);
       const barcode = getCol(cols, ['barcode', 'kode_barcode']);
       const stok_awal = Number(getCol(cols, ['stok_awal', 'stok']) || 0);
       const gudang = getCol(cols, ['gudang', 'warehouse']);
       const lokasi = getCol(cols, ['lokasi', 'location']);
-      const letak = getCol(cols, ['letak', 'letak_barang', 'rak', 'posisi']);
+      const letak_barang = getCol(cols, ['letak_barang', 'letak', 'rak', 'posisi']);
       const stok_minimum = Number(getCol(cols, ['stok_minimum', 'minimum_stok', 'min_stok']) || 0);
-      const status_data = getCol(cols, ['status_data', 'status']) || 'aktif';
+      const status = (getCol(cols, ['status', 'status_data']) || 'aktif').toLowerCase();
 
-      if (!kode && !nama_barang) continue;
+      if (!kode_barang && !nama_barang) continue;
 
       rows.push({
-        id: crypto.randomUUID(),
-        kode: kode,
-        nama_barang: nama_barang,
-        barcode: barcode,
-        gudang: gudang,
-        lokasi: lokasi,
-        letak: letak,
-        stok_awal: stok_awal,
-        stok_minimum: stok_minimum,
-        stok_saat_ini: stok_awal,
-        status_data: status_data
+        kode_barang,
+        nama_barang,
+        barcode,
+        gudang,
+        lokasi,
+        letak_barang,
+        stok_awal,
+        stok_minimum,
+        status
       });
     }
 
@@ -1134,28 +1126,22 @@ async function loadProducts() {
       return;
     }
 
-    let barangLama = JSON.parse(localStorage.getItem('data_barang') || '[]');
+    const { error } = await client.from('products').insert(rows);
 
-    rows.forEach(newItem => {
-      const index = barangLama.findIndex(x => String(x.kode).trim() === String(newItem.kode).trim());
-      if (index >= 0) {
-        barangLama[index] = {
-          ...barangLama[index],
-          ...newItem
-        };
-      } else {
-        barangLama.push(newItem);
-      }
-    });
-
-    localStorage.setItem('data_barang', JSON.stringify(barangLama));
-
-    if (typeof loadDataBarang === 'function') loadDataBarang();
-    if (typeof renderTableBarang === 'function') renderTableBarang();
-    if (typeof tampilkanDataBarang === 'function') tampilkanDataBarang();
+    if (error) {
+      setDebug('Gagal insert: ' + error.message, true);
+      return;
+    }
 
     fileInput.value = '';
-    setDebug(`Import berhasil. ${rows.length} data diproses.`, false);
+    setDebug(`Import berhasil. ${rows.length} data masuk database.`, false);
+
+    await loadProducts();
+    await loadTransactions();
+    await loadOpnames();
+    renderProductsTable();
+    renderDashboard();
+    showTab('barang');
 
   } catch (err) {
     console.error(err);
