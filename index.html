@@ -514,7 +514,7 @@
       }
     }
 
- async function loadSemua() {
+async function loadSemua() {
   await loadProducts();
   await loadTransactions();
   await loadOpnames();
@@ -523,11 +523,18 @@
   renderKartuStok();
   renderRiwayatOpname();
   renderDashboard();
+  resetFormBarang();
+
+  isiDropdownBarangMasuk();
+  isiDropdownBarangKeluar();
 
   setDebug('Semua data berhasil di-refresh.');
 }
 async function loadProducts() {
-  const { data, error } = await client.from('products').select('*');
+  const { data, error } = await client
+    .from('products')
+    .select('*')
+    .order('created_at', { ascending: false });
 
   if (error) {
     setDebug('Gagal load products: ' + error.message, true);
@@ -544,6 +551,10 @@ async function loadProducts() {
     stok_minimum: Number(item.stok_minimum ?? 0),
     status: item.status || 'aktif'
   }));
+
+  renderProductsTable();
+  isiDropdownBarangMasuk();
+  isiDropdownBarangKeluar();
 }
     async function loadTransactions() {
   const { data, error } = await client
@@ -750,48 +761,59 @@ async function loadProducts() {
       document.getElementById('kartuStokWrap').innerHTML = html;
     }
 
-    function resetFormBarang() {
-      editingId = null;
-      document.getElementById('barang_kode').value = generateKodeBarang();
-      document.getElementById('barang_nama').value = '';
-      document.getElementById('barang_barcode').value = '';
-      document.getElementById('barang_gudang').value = '';
-      document.getElementById('barang_lokasi').value = '';
-      document.getElementById('barang_letak').value = '';
-      document.getElementById('barang_stok_awal').value = '';
-      document.getElementById('barang_stok_minimum').value = '';
-      document.getElementById('barang_status').value = 'aktif';
-      document.getElementById('btnUpdateBarang').classList.add('hidden');
-      document.getElementById('btnSimpanBarang').classList.remove('hidden');
-    }
+   function resetFormBarang() {
+  editingId = null;
+  document.getElementById('barang_kode').value = generateKodeBarang();
+  document.getElementById('barang_nama').value = '';
+  document.getElementById('barang_barcode').value = '';
+  document.getElementById('barang_gudang').value = '';
+  document.getElementById('barang_lokasi').value = '';
+  document.getElementById('barang_letak').value = '';
+  document.getElementById('barang_stok_awal').value = '';
+  document.getElementById('barang_stok_minimum').value = '';
+  document.getElementById('barang_status').value = 'aktif';
+  document.getElementById('btnUpdateBarang').classList.add('hidden');
+  document.getElementById('btnSimpanBarang').classList.remove('hidden');
+}
 
-    async function simpanBarang() {
-      if (!isAdmin()) return setDebug('Hanya admin yang bisa tambah barang.', true);
+ async function simpanBarang() {
+  if (!isAdmin()) return setDebug('Hanya admin yang bisa tambah barang.', true);
 
-      const payload = {
-        kode_barang: document.getElementById('barang_kode').value,
-        nama_barang: document.getElementById('barang_nama').value,
-        barcode: document.getElementById('barang_barcode').value,
-        gudang: document.getElementById('barang_gudang').value,
-        lokasi: document.getElementById('barang_lokasi').value,
-        letak_barang: document.getElementById('barang_letak').value,
-        stok_awal: Number(document.getElementById('barang_stok_awal').value || 0),
-        stok_minimum: Number(document.getElementById('barang_stok_minimum').value || 0),
-        status: document.getElementById('barang_status').value
-      };
+  let kodeBarang = document.getElementById('barang_kode').value.trim();
+  if (!kodeBarang) {
+    kodeBarang = generateKodeBarang();
+    document.getElementById('barang_kode').value = kodeBarang;
+  }
 
-      if (!payload.nama_barang) return setDebug('Nama barang wajib diisi.', true);
+  const payload = {
+    kode_barang: kodeBarang,
+    nama_barang: document.getElementById('barang_nama').value.trim(),
+    barcode: document.getElementById('barang_barcode').value.trim(),
+    gudang: document.getElementById('barang_gudang').value.trim(),
+    lokasi: document.getElementById('barang_lokasi').value.trim(),
+    letak_barang: document.getElementById('barang_letak').value.trim(),
+    stok_awal: Number(document.getElementById('barang_stok_awal').value || 0),
+    stok_minimum: Number(document.getElementById('barang_stok_minimum').value || 0),
+    status: document.getElementById('barang_status').value || 'aktif'
+  };
 
-      const { error } = await client.from('products').insert([payload]);
-      if (error) return setDebug('Gagal tambah barang: ' + error.message, true);
+  if (!payload.nama_barang) return setDebug('Nama barang wajib diisi.', true);
 
-      setDebug('Data barang berhasil disimpan.');
-      resetFormBarang();
-      await loadProducts();
-      await loadTransactions();
-      renderDashboard();
-    }
+  const { error } = await client.from('products').insert([payload]);
 
+  if (error) {
+    return setDebug('Gagal tambah barang: ' + error.message, true);
+  }
+
+  setDebug('Data barang berhasil disimpan.');
+  await loadProducts();
+  await loadTransactions();
+  await loadOpnames();
+  renderProductsTable();
+  renderDashboard();
+  resetFormBarang();
+  showTab('barang');
+}
     function editBarang(id) {
       if (!isAdmin()) return;
       const item = productsData.find(x => x.id === id);
