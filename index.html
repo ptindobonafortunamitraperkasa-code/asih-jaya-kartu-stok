@@ -1013,7 +1013,7 @@
       document.getElementById('riwayatOpnameWrap').innerHTML = html;
     }
 
- async function importBarangCSV() {
+async function importBarangCSV() {
   if (!isAdmin()) return setDebug('Hanya admin yang bisa import data barang.', true);
 
   const fileInput = document.getElementById('import_barang_file');
@@ -1024,61 +1024,76 @@
     return;
   }
 
-  const text = await file.text();
-  const lines = text.split(/\r?\n/).map(x => x.trim()).filter(x => x);
+  try {
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).map(x => x.trim()).filter(x => x);
 
-  if (lines.length < 2) {
-    setDebug('File CSV kosong atau tidak valid.', true);
-    return;
+    if (lines.length < 2) {
+      setDebug('File CSV kosong atau tidak valid.', true);
+      return;
+    }
+
+    const rows = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',').map(x => x.replace(/^"|"$/g, '').trim());
+
+      const kode_barang = cols[0] || '';
+      const nama_barang = cols[1] || '';
+      const barcode = cols[2] || '';
+      const gudang = cols[3] || '';
+      const lokasi = cols[4] || '';
+      const letak_barang = cols[5] || '';
+      const stok_awal = Number(cols[6] || 0);
+      const stok_minimum = Number(cols[7] || 0);
+      const status = (cols[8] || 'aktif').toLowerCase();
+
+      if (!kode_barang && !nama_barang) continue;
+
+      rows.push({
+        kode_barang,
+        nama_barang,
+        sku: kode_barang,
+        name: nama_barang,
+        barcode,
+        gudang,
+        lokasi,
+        letak_barang,
+        stok_awal,
+        stok_minimum,
+        status
+      });
+    }
+
+    if (rows.length === 0) {
+      setDebug('Tidak ada data barang valid untuk diimport.', true);
+      return;
+    }
+
+    const { error } = await client
+      .from('products')
+      .upsert(rows, { onConflict: 'kode_barang' });
+
+    if (error) {
+      setDebug('Gagal import: ' + error.message, true);
+      return;
+    }
+
+    setDebug('Import berhasil: ' + rows.length + ' data');
+    fileInput.value = '';
+
+    await loadProducts();
+    await loadTransactions();
+    await loadOpnames();
+    renderDashboard();
+    renderProductsTable();
+    showTab('barang');
+
+  } catch (err) {
+    console.error(err);
+    setDebug('Terjadi error saat import CSV: ' + err.message, true);
   }
-
-  const rows = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(',').map(x => x.replace(/^"|"$/g, '').trim());
-
-    const row = {
-      kode_barang: cols[0] || '',
-      nama_barang: cols[1] || '',
-      barcode: cols[2] || '',
-      gudang: cols[3] || '',
-      lokasi: cols[4] || '',
-      letak_barang: cols[5] || '',
-      stok_awal: Number(cols[6] || 0),
-      stok_minimum: Number(cols[7] || 0),
-      status: (cols[8] || 'aktif').toLowerCase()
-    };
-
-    if (!row.kode_barang && !row.nama_barang) continue;
-
-    rows.push(row);
-  }
-
-  if (rows.length === 0) {
-    setDebug('Tidak ada data barang valid untuk diimport.', true);
-    return;
-  }
-
-  const { error } = await client
-    .from('products')
-    .upsert(rows, { onConflict: 'kode_barang' });
-
-  if (error) {
-    setDebug('Gagal import: ' + error.message, true);
-    return;
-  }
-
-  setDebug('Import berhasil: ' + rows.length + ' data');
-  fileInput.value = '';
-
-  await loadProducts();
-  await loadTransactions();
-  await loadOpnames();
-  renderDashboard();
-  renderProductsTable();
-  showTab('barang');
 }
-
     function downloadCSV(filename, rows) {
       const csvContent = rows.map(row =>
         row.map(value => {
