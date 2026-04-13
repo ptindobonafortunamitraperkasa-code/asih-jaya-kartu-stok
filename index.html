@@ -524,15 +524,37 @@
       setDebug('Semua data berhasil di-refresh.');
     }
 
-    async function loadProducts() {
-      const { data, error } = await client.from('products').select('*').order('created_at', { ascending: false });
-      if (error) return setDebug('Gagal load products: ' + error.message, true);
-      productsData = data || [];
-      document.getElementById('barang_kode').value = generateKodeBarang();
-      isiDropdownBarangMasuk();
-      isiDropdownBarangKeluar();
-      renderProductsTable();
-    }
+  async function loadProducts() {
+  const { data, error } = await client
+    .from('products')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return setDebug('Gagal load products: ' + error.message, true);
+  }
+
+  productsData = (data || []).map(item => ({
+    ...item,
+    kode_barang: item.kode_barang || item.sku || item.barcode || '',
+    nama_barang: item.nama_barang || item.name || '',
+    stok_awal: Number(item.stok_awal || 0),
+    stok_minimum: Number(item.stok_minimum || 0),
+    gudang: item.gudang || '',
+    lokasi: item.lokasi || '',
+    letak_barang: item.letak_barang || '',
+    status: item.status || 'aktif'
+  }));
+
+  document.getElementById('barang_kode').value = generateKodeBarang();
+  isiDropdownBarangMasuk();
+  isiDropdownBarangKeluar();
+  renderProductsTable();
+  renderDashboard();
+
+  console.log('productsData normalized:', productsData);
+  setDebug('Data barang berhasil dimuat: ' + productsData.length + ' item');
+}
 
     async function loadTransactions() {
       const { data, error } = await client.from('stock_transactions').select('*').order('tanggal', { ascending: false });
