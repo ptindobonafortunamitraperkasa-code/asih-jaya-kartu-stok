@@ -525,26 +525,44 @@
     }
 
   async function loadProducts() {
-  const { data, error } = await client
-    .from('products')
-    .select('*')
-   .order('id', { ascending: false })
+  let allData = [];
+  let from = 0;
+  const pageSize = 1000;
 
-  if (error) {
-    return setDebug('Gagal load products: ' + error.message, true);
+  while (true) {
+    const { data, error } = await client
+      .from('products')
+      .select('*')
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      return setDebug('Gagal load products: ' + error.message, true);
+    }
+
+    if (!data || data.length === 0) break;
+
+    allData = allData.concat(data);
+
+    if (data.length < pageSize) break;
+    from += pageSize;
   }
 
-  productsData = (data || []).map(item => ({
+  productsData = allData.map(item => ({
     ...item,
     kode_barang: item.kode_barang || item.sku || item.barcode || '',
     nama_barang: item.nama_barang || item.name || '',
-    stok_awal: Number(item.stok_awal || 0),
-    stok_minimum: Number(item.stok_minimum || 0),
+    barcode: item.barcode || '',
     gudang: item.gudang || '',
     lokasi: item.lokasi || '',
     letak_barang: item.letak_barang || '',
+    stok_awal: Number(item.stok_awal || 0),
+    stok_minimum: Number(item.stok_minimum || 0),
     status: item.status || 'aktif'
   }));
+
+  productsData.sort((a, b) =>
+    (a.nama_barang || '').localeCompare(b.nama_barang || '', 'id')
+  );
 
   document.getElementById('barang_kode').value = generateKodeBarang();
   isiDropdownBarangMasuk();
@@ -552,10 +570,13 @@
   renderProductsTable();
   renderDashboard();
 
-  console.log('productsData normalized:', productsData);
+  console.log('FINAL productsData count:', productsData.length);
+  console.log('FINAL ASCA rows:', productsData.filter(x =>
+    (x.nama_barang || '').toLowerCase().includes('asca')
+  ));
+
   setDebug('Data barang berhasil dimuat: ' + productsData.length + ' item');
 }
-
     async function loadTransactions() {
       const { data, error } = await client.from('stock_transactions').select('*').order('tanggal', { ascending: false });
       if (error) return setDebug('Gagal load transaksi: ' + error.message, true);
