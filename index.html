@@ -650,21 +650,27 @@
         });
     }
 
-    function getFilteredProducts() {
-      const cari = (document.getElementById('cari_barang').value || '').toLowerCase();
-      const lokasiFilter = (document.getElementById('filter_lokasi_barang').value || '').toLowerCase();
+ function getFilteredProducts() {
+  const cari = (document.getElementById('cari_barang').value || '').toLowerCase().trim();
+  const lokasiFilter = (document.getElementById('filter_lokasi_barang').value || '').toLowerCase().trim();
 
-      return productsData.filter(item => {
-        const cocokCari =
-          !cari ||
-          (item.nama_barang || '').toLowerCase().includes(cari) ||
-          (item.kode_barang || '').toLowerCase().includes(cari);
-        const cocokLokasi =
-          !lokasiFilter ||
-          (item.lokasi || '').toLowerCase().includes(lokasiFilter);
-        return cocokCari && cocokLokasi;
-      });
-    }
+  return productsData.filter(item => {
+    const nama = (item.nama_barang || item.name || '').toLowerCase();
+    const kode = (item.kode_barang || item.sku || item.barcode || '').toLowerCase();
+    const lokasi = (item.lokasi || '').toLowerCase();
+
+    const cocokCari =
+      !cari ||
+      nama.includes(cari) ||
+      kode.includes(cari);
+
+    const cocokLokasi =
+      !lokasiFilter ||
+      lokasi.includes(lokasiFilter);
+
+    return cocokCari && cocokLokasi;
+  });
+}
 function renderProductsTable() {
   const rows = getFilteredProducts();
   const wrap = document.getElementById('productsTableWrap');
