@@ -1,6 +1,3 @@
-
-
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -522,17 +519,24 @@
       renderDashboard();
       setDebug('Semua data berhasil di-refresh.');
     }
+async function loadProducts() {
+  const { data, error } = await client.from('products').select('*');
 
-    async function loadProducts() {
-      const { data, error } = await client.from('products').select('*').order('created_at', { ascending: false });
-      if (error) return setDebug('Gagal load products: ' + error.message, true);
-      productsData = data || [];
-      document.getElementById('barang_kode').value = generateKodeBarang();
-      isiDropdownBarangMasuk();
-      isiDropdownBarangKeluar();
-      renderProductsTable();
-    }
+  if (error) {
+    console.error(error);
+    return;
+  }
 
+productsData = (data || []).map(item => ({
+  ...item,
+  kode_barang: item.kode_barang || item.kode || '',
+  nama_barang: item.nama_barang || item.nama || '',
+  letak_barang: item.letak_barang || item.letak || '',
+  stok_awal: Number(item.stok_awal ?? item.stok ?? 0),
+  stok_minimum: Number(item.stok_minimum ?? 0),
+  status: item.status || 'aktif'
+}));
+}
     async function loadTransactions() {
       const { data, error } = await client.from('stock_transactions').select('*').order('tanggal', { ascending: false });
       if (error) return setDebug('Gagal load transaksi: ' + error.message, true);
@@ -1013,65 +1017,137 @@
       document.getElementById('riwayatOpnameWrap').innerHTML = html;
     }
 
-    async function importBarangCSV() {
-      if (!isAdmin()) return setDebug('Hanya admin yang bisa import data barang.', true);
+async function importBarangCSV() {
+  if (!isAdmin()) {
+    setDebug('Hanya admin yang bisa import data barang.', true);
+    return;
+  }
 
-      const fileInput = document.getElementById('import_barang_file');
-      const file = fileInput.files[0];
+  const fileInput = document.getElementById('import_barang_file');
+  const file = fileInput?.files?.[0];
 
-      if (!file) {
-        setDebug('Pilih file CSV dulu.', true);
-        return;
-      }
+  if (!file) {
+    setDebug('Pilih file CSV dulu.', true);
+    return;
+  }
 
-      const text = await file.text();
-      const lines = text.split('\n').map(x => x.trim()).filter(x => x);
+  try {
+    const text = await file.text();
 
-      if (lines.length < 2) {
-        setDebug('File CSV kosong atau tidak valid.', true);
-        return;
-      }
+    const lines = text
+      .split(/\r?\n/)
+      .map(x => x.trim())
+      .filter(x => x);
 
-      const rows = [];
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',').map(x => x.replace(/^"|"$/g, '').trim());
-
-        rows.push({
-          kode_barang: cols[0] || ('ASH' + String(productsData.length + i).padStart(3, '0')),
-          nama_barang: cols[1] || '',
-          barcode: cols[2] || '',
-          stok_awal: Number(cols[3] || 0),
-          gudang: cols[4] || '',
-          lokasi: cols[5] || '',
-          letak_barang: cols[6] || '',
-          status: cols[7] || 'aktif',
-          stok_minimum: Number(cols[8] || 0)
-        });
-      }
-
-   const validRows = rows.filter(r => {
-  return r.nama_barang || r.nama || r.kode || r.barcode;
-});
-
-      if (validRows.length === 0) {
-        setDebug('Tidak ada data barang valid untuk diimport.', true);
-        return;
-      }
-
-      const { error } = await client.from('products').insert(validRows);
-
-      if (error) {
-        setDebug('Gagal import barang: ' + error.message, true);
-        return;
-      }
-
-      setDebug('Import data barang berhasil: ' + validRows.length + ' item');
-      fileInput.value = '';
-      await loadProducts();
-      await loadTransactions();
-      renderDashboard();
+    if (lines.length < 2) {
+      setDebug('File CSV kosong atau tidak valid.', true);
+      return;
     }
 
+    const delimiter = lines[0].includes(';') ? ';' : ',';
+
+    function parseCSVLine(line, delimiter = ',') {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        const next = line[i + 1];
+
+        if (char === '"') {
+          if (inQuotes && next === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === delimiter && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+
+      result.push(current.trim());
+      return result.map(v => v.replace(/^"|"$/g, '').trim());
+    }
+
+    function normalizeHeader(header) {
+      return (header || '')
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '_');
+    }
+
+    const headers = parseCSVLine(lines[0], delimiter).map(normalizeHeader);
+
+    function getCol(cols, possibleNames) {
+      for (const name of possibleNames) {
+        const idx = headers.indexOf(name);
+        if (idx !== -1) return cols[idx] ?? '';
+      }
+      return '';
+    }
+
+    const rows = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseCSVLine(lines[i], delimiter);
+
+      const kode_barang = getCol(cols, ['kode_barang', 'kode', 'item_code', 'sku']);
+      const nama_barang = getCol(cols, ['nama_barang', 'nama', 'nama_item', 'item_name']);
+      const barcode = getCol(cols, ['barcode', 'kode_barcode']);
+      const stok_awal = Number(getCol(cols, ['stok_awal', 'stok']) || 0);
+      const gudang = getCol(cols, ['gudang', 'warehouse']);
+      const lokasi = getCol(cols, ['lokasi', 'location']);
+      const letak_barang = getCol(cols, ['letak_barang', 'letak', 'rak', 'posisi']);
+      const stok_minimum = Number(getCol(cols, ['stok_minimum', 'minimum_stok', 'min_stok']) || 0);
+      const status = (getCol(cols, ['status', 'status_data']) || 'aktif').toLowerCase();
+
+      if (!kode_barang && !nama_barang) continue;
+
+      rows.push({
+        kode_barang,
+        nama_barang,
+        barcode,
+        gudang,
+        lokasi,
+        letak_barang,
+        stok_awal,
+        stok_minimum,
+        status
+      });
+    }
+
+    if (!rows.length) {
+      setDebug('Tidak ada data yang berhasil dibaca dari CSV.', true);
+      return;
+    }
+
+    const { error } = await client.from('products').insert(rows);
+
+    if (error) {
+      setDebug('Gagal insert: ' + error.message, true);
+      return;
+    }
+
+    fileInput.value = '';
+    setDebug(`Import berhasil. ${rows.length} data masuk database.`, false);
+
+    await loadProducts();
+    await loadTransactions();
+    await loadOpnames();
+    renderProductsTable();
+    renderDashboard();
+    showTab('barang');
+
+  } catch (err) {
+    console.error(err);
+    setDebug('Terjadi error saat import CSV: ' + err.message, true);
+  }
+}
     function downloadCSV(filename, rows) {
       const csvContent = rows.map(row =>
         row.map(value => {
@@ -1113,6 +1189,7 @@
       win.document.close();
       win.print();
     }
+
 
     function buildStokRows(data) {
       const rows = [[
@@ -1331,127 +1408,7 @@
     }
 
     window.addEventListener('load', cekSession);
-  </script>
-  <script>
-    <script>
-(function(){
 
-function getTable(){
-  return document.querySelector("#kartu-stok-table");
-}
-
-function tambahUI(){
-  if(document.getElementById("export-bar")) return;
-
-  const table = getTable();
-  if(!table) return;
-
-  const div = document.createElement("div");
-  div.id = "export-bar";
-  div.style.margin = "10px 0";
-  div.innerHTML = `
-    <button onclick="pilihSemua()">Pilih Semua</button>
-    <button onclick="batalPilih()">Batal Pilih</button>
-    <button onclick="exportPDF()">Export PDF</button>
-  `;
-  table.parentElement.insertBefore(div, table);
-}
-
-function tambahCheckbox(){
-  const table = getTable();
-  if(!table) return;
-
-  const head = table.querySelector("thead tr");
-  if(head && !head.querySelector(".chk")){
-    const th = document.createElement("th");
-    th.className = "chk";
-    th.innerText = "Pilih";
-    head.prepend(th);
-  }
-
-  table.querySelectorAll("tbody tr").forEach(tr=>{
-    if(tr.querySelector(".chk")) return;
-    const td = document.createElement("td");
-    td.innerHTML = `<input type="checkbox" class="row-check">`;
-    tr.prepend(td);
-  });
-}
-
-window.pilihSemua = function(){
-  document.querySelectorAll(".row-check").forEach(x=>x.checked=true);
-}
-
-window.batalPilih = function(){
-  document.querySelectorAll(".row-check").forEach(x=>x.checked=false);
-}
-
-window.exportPDF = function(){
-  const rows = [...document.querySelectorAll("#kartu-stok-table tbody tr")];
-  const data = rows.filter(tr=>{
-    const cb = tr.querySelector(".row-check");
-    return !document.querySelectorAll(".row-check:checked").length || cb.checked;
-  });
-
-  if(!data.length){
-    alert("Tidak ada data");
-    return;
-  }
-
-  const html = `
-  <html>
-  <head><title>Export</title></head>
-  <body>
-  <h3>Kartu Stok</h3>
-  <table border="1" cellspacing="0" cellpadding="5">
-    <tr>
-      <th>No</th>
-      <th>Tanggal</th>
-      <th>Kode</th>
-      <th>Nama</th>
-      <th>Masuk</th>
-      <th>Keluar</th>
-      <th>Saldo</th>
-      <th>Gudang</th>
-      <th>Lokasi</th>
-    </tr>
-    ${
-      data.map((tr,i)=>{
-        const td = tr.querySelectorAll("td");
-        return `
-        <tr>
-          <td>${i+1}</td>
-          <td>${td[1]?.innerText||""}</td>
-          <td>${td[2]?.innerText||""}</td>
-          <td>${td[3]?.innerText||""}</td>
-          <td>${td[4]?.innerText||""}</td>
-          <td>${td[5]?.innerText||""}</td>
-          <td>${td[6]?.innerText||""}</td>
-          <td>${td[7]?.innerText||""}</td>
-          <td>${td[8]?.innerText||""}</td>
-        </tr>`;
-      }).join("")
-    }
-  </table>
-  </body>
-  </html>
-  `;
-
-  const w = window.open("");
-  w.document.write(html);
-  w.document.close();
-  w.print();
-}
-
-function init(){
-  tambahUI();
-  tambahCheckbox();
-}
-
-document.addEventListener("DOMContentLoaded", ()=>{
-  setTimeout(init,500);
-});
-
-})();
 </script>
 </body>
 </html>
