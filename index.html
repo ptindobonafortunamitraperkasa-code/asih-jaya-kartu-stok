@@ -523,10 +523,17 @@
       setDebug('Semua data berhasil di-refresh.');
     }
 
-    async function loadProducts() {
-      const { data, error } = await client.from('products').select('*').order('created_at', { ascending: false });
-      if (error) return setDebug('Gagal load products: ' + error.message, true);
-      productsData = data || [];
+ productsData = (data || []).map(item => ({
+  ...item,
+  kode_barang: item.kode_barang || item.sku || '',
+  nama_barang: item.nama_barang || item.name || '',
+  gudang: item.gudang || '',
+  lokasi: item.lokasi || '',
+  letak_barang: item.letak_barang || '',
+  stok_awal: Number(item.stok_awal ?? 0),
+  stok_minimum: Number(item.stok_minimum ?? 0),
+  status: item.status || 'aktif'
+}));
       document.getElementById('barang_kode').value = generateKodeBarang();
       isiDropdownBarangMasuk();
       isiDropdownBarangKeluar();
