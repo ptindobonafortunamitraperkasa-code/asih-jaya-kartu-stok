@@ -531,24 +531,110 @@ async function loadProducts() {
     return;
   }
 
+  // NORMALISASI FIELD BIAR DASHBOARD BISA BACA
   productsData = (data || []).map(item => ({
     ...item,
-    kode_barang: item.kode_barang || item.kode || '',
-    nama_barang: item.nama_barang || item.nama || '',
-    barcode: item.barcode || '',
-    stok_awal: Number(item.stok_awal ?? item.stok ?? 0),
-    gudang: item.gudang || '',
-    lokasi: item.lokasi || '',
-    letak_barang: item.letak_barang || item.letak || '',
-    stok_minimum: Number(item.stok_minimum ?? 0),
-    status: item.status || 'aktif'
-  }));
 
-  renderProductsTable();
-  renderDashboard();
-  isiDropdownBarangMasuk();
-  isiDropdownBarangKeluar();
+    // samakan nama field
+    nama: item.nama || item.nama_barang || '',
+    kode: item.kode || item.kode_barang || '',
+
+    // stok
+    stok: item.stok ?? item.stok_awal ?? 0
+  }));
 }
+    async function loadTransactions() {
+      const { data, error } = await client.from('stock_transactions').select('*').order('tanggal', { ascending: false });
+      if (error) return setDebug('Gagal load transaksi: ' + error.message, true);
+      transactionsData = data || [];
+      renderKartuStok();
+      renderProductsTable();
+    }
+
+    async function loadOpnames() {
+      const { data, error } = await client.from('stock_opnames').select('*').order('created_at', { ascending: false });
+      if (error) return setDebug('Gagal load opname: ' + error.message, true);
+      opnamesData = data || [];
+      await renderRiwayatOpname();
+    }
+
+    function hitungStokBarang(productId) {
+      const barang = productsData.find(x => x.id === productId);
+      const stokAwal = Number(barang?.stok_awal || 0);
+      let masuk = 0;
+      let keluar = 0;
+      transactionsData.forEach(trx => {
+        if (trx.product_id === productId) {
+          if (trx.jenis_transaksi === 'masuk') masuk += Number(trx.jumlah || 0);
+          if (trx.jenis_transaksi === 'keluar') keluar += Number(trx.jumlah || 0);
+        }
+      });
+      return stokAwal + masuk - keluar;
+    }
+
+    function statusStok(item) {
+      const stok = hitungStokBarang(item.id);
+      const min = Number(item.stok_minimum || 0);
+      if (stok <= 0) return { text: 'Wajib Order', cls: 'status-bad' };
+      if (min > 0 && stok <= min) return { text: 'Menipis', cls: 'status-warn' };
+      return { text: 'Aman', cls: 'status-ok' };
+    }
+
+    function renderDashboard() {
+      document.getElementById('dash_total_barang').textContent = productsData.length;
+      document.getElementById('dash_total_stok').textContent = productsData.reduce((a, b) => a + hitungStokBarang(b.id), 0);
+      document.getElementById('dash_stok_menipis').textContent = productsData.filter(x => statusStok(x).text === 'Menipis').length;
+      document.getElementById('dash_wajib_order').textContent = productsData.filter(x => statusStok(x).text === 'Wajib Order').length;
+
+      let notif = '<div class="card"><b>Notifikasi Stok</b>';
+      const list = productsData.filter(x => ['Menipis', 'Wajib Order'].includes(statusStok(x).text));
+      if (list.length === 0) {
+        notif += '<p class="status-ok">Tidak ada stok kritis.</p>';
+      } else {
+        notif += '<table><tr><th>Barang</th><th>Gudang</th><th>Lokasi</th><th>Stok</th><th>Minimum</th><th>Status</th></tr>';
+        list.forEach(item => {
+          const st = statusStok(item);
+          notif += `<tr>
+            <td>${item.nama_barang}</td>
+            <td>${item.gudang || ''}</td>
+            <td>${item.lokasi || ''}</td>
+            <td>${hitungStokBarang(item.id)}</td>
+            <td>${item.stok_minimum || 0}</td>
+            <td class="${st.cls}">${st.text}</td>
+          </tr>`;
+        });
+        notif += '</table>';
+      }
+      notif += '</div>';
+      document.getElementById('dashboardNotif').innerHTML = notif;
+    }
+
+    function isiDropdownBarangMasuk() {
+      const q = (document.getElementById('search_masuk').value || '').toLowerCase();
+      const select = document.getElementById('masuk_product');
+      select.innerHTML = '';
+      productsData
+        .filter(item => !q || (item.nama_barang || '').toLowerCase().includes(q) || (item.kode_barang || '').toLowerCase().includes(q))
+        .forEach(item => {
+          const opt = document.createElement('option');
+          opt.value = item.id;
+          opt.textContent = `${item.nama_barang} | ${item.gudang || '-'} | ${item.lokasi || '-'} | ${item.letak_barang || '-'}`;
+          select.appendChild(opt);
+        });
+    }
+
+    function isiDropdownBarangKeluar() {
+      const q = (document.getElementById('search_keluar').value || '').toLowerCase();
+      const select = document.getElementById('keluar_product');
+      select.innerHTML = '';
+      productsData
+        .filter(item => !q || (item.nama_barang || '').toLowerCase().includes(q) || (item.kode_barang || '').toLowerCase().includes(q))
+        .forEach(item => {
+          const opt = document.createElement('option');
+          opt.value = item.id;
+          opt.textContent = `${item.nama_barang} | ${item.gudang || '-'} | ${item.lokasi || '-'} | ${item.letak_barang || '-'}`;
+          select.appendChild(opt);
+        });
     }
 
     function getFilteredProducts() {
@@ -568,7 +654,7 @@ async function loadProducts() {
     }
 
     function renderProductsTable() {
-   const rows = getFilteredProducts().filter(item => item.nama_barang);
+      const rows = getFilteredProducts();
 
       let html = '<table><tr><th>Kode</th><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Letak</th><th>Stok Awal</th><th>Stok Minimum</th><th>Stok Saat Ini</th><th>Status Stok</th><th>Status Data</th>';
       if (isAdmin()) html += '<th>Aksi</th>';
@@ -937,96 +1023,406 @@ async function loadProducts() {
       document.getElementById('riwayatOpnameWrap').innerHTML = html;
     }
 
+ async function importBarangCSV() {
+  if (!isAdmin()) {
+    setDebug('Hanya admin yang bisa import data barang.', true);
+    return;
+  }
 
-  function exportOpnamePDF() {
-  let html = '<table><tr><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Stok Sistem</th><th>Stok Fisik</th><th>Selisih</th><th>Status</th><th>Keterangan</th><th>Petugas</th></tr>';
-  opnamesData.forEach(op => {
-    const barang = productsData.find(x => x.id === op.product_id);
-    html += `<tr>
-      <td>${barang?.nama_barang || ''}</td>
-      <td>${op.gudang || ''}</td>
-      <td>${op.lokasi || ''}</td>
-      <td>${op.stok_sistem || 0}</td>
-      <td>${op.stok_fisik || 0}</td>
-      <td>${op.selisih || 0}</td>
-      <td>${op.status || ''}</td>
-      <td>${op.keterangan || ''}</td>
-      <td>${op.petugas_opname || ''}</td>
-    </tr>`;
-  });
-  html += '</table>';
-  openPrintWindow('Opname', html);
-}
+  const fileInput = document.getElementById('import_barang_file');
+  const file = fileInput?.files?.[0];
 
-async function importBarangCSV() {
+  if (!file) {
+    setDebug('Pilih file CSV dulu.', true);
+    return;
+  }
+
   try {
-    if (!isAdmin()) {
-      alert('Hanya admin yang bisa import');
-      return;
-    }
-
-    const fileInput = document.getElementById('import_barang_file');
-    const file = fileInput && fileInput.files ? fileInput.files[0] : null;
-
-    if (!file) {
-      alert('Pilih file CSV dulu');
-      return;
-    }
-
     const text = await file.text();
-    const lines = text.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+
+    const lines = text
+      .split(/\r?\n/)
+      .map(x => x.trim())
+      .filter(x => x);
 
     if (lines.length < 2) {
-      alert('CSV kosong / tidak valid');
+      setDebug('File CSV kosong atau tidak valid.', true);
       return;
     }
 
     const delimiter = lines[0].includes(';') ? ';' : ',';
-    const dataInsert = [];
+
+    function parseCSVLine(line, delimiter = ',') {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        const next = line[i + 1];
+
+        if (char === '"') {
+          if (inQuotes && next === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === delimiter && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+
+      result.push(current.trim());
+      return result.map(v => v.replace(/^"|"$/g, '').trim());
+    }
+
+    function normalizeHeader(header) {
+      return (header || '')
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '_');
+    }
+
+    const headers = parseCSVLine(lines[0], delimiter).map(normalizeHeader);
+
+    function getCol(cols, possibleNames) {
+      for (const name of possibleNames) {
+        const idx = headers.indexOf(name);
+        if (idx !== -1) return cols[idx] ?? '';
+      }
+      return '';
+    }
+
+    const rows = [];
 
     for (let i = 1; i < lines.length; i++) {
- if (!cols[0] || !cols[1]) continue;
+      const cols = parseCSVLine(lines[i], delimiter);
 
-      if (!cols[0] || !cols[1]) continue;
+      const kode = getCol(cols, ['kode', 'kode_barang', 'item_code', 'sku']);
+      const nama_barang = getCol(cols, ['nama_barang', 'nama', 'nama_item', 'item_name']);
+      const barcode = getCol(cols, ['barcode', 'kode_barcode']);
+      const stok_awal = Number(getCol(cols, ['stok_awal', 'stok']) || 0);
+      const gudang = getCol(cols, ['gudang', 'warehouse']);
+      const lokasi = getCol(cols, ['lokasi', 'location']);
+      const letak = getCol(cols, ['letak', 'letak_barang', 'rak', 'posisi']);
+      const stok_minimum = Number(getCol(cols, ['stok_minimum', 'minimum_stok', 'min_stok']) || 0);
+      const status_data = getCol(cols, ['status_data', 'status']) || 'aktif';
 
-      dataInsert.push({
-        kode_barang: cols[0],
-        nama_barang: cols[1],
-        barcode: cols[2] || '',
-        stok_awal: Number(cols[3] || 0),
-        gudang: cols[4] || '',
-        lokasi: cols[5] || '',
-        letak_barang: cols[6] || '',
-        stok_minimum: Number(cols[7] || 0),
-        status: cols[8] || 'aktif'
+      if (!kode && !nama_barang) continue;
+
+      rows.push({
+        id: crypto.randomUUID(),
+        kode: kode,
+        nama_barang: nama_barang,
+        barcode: barcode,
+        gudang: gudang,
+        lokasi: lokasi,
+        letak: letak,
+        stok_awal: stok_awal,
+        stok_minimum: stok_minimum,
+        stok_saat_ini: stok_awal,
+        status_data: status_data
       });
     }
 
-    if (!dataInsert.length) {
-      alert('Tidak ada data valid');
+    if (!rows.length) {
+      setDebug('Tidak ada data yang berhasil dibaca dari CSV.', true);
       return;
     }
 
-    const { error } = await client.from('products').insert(dataInsert);
+    let barangLama = JSON.parse(localStorage.getItem('data_barang') || '[]');
 
-    if (error) {
-      alert('Gagal import: ' + error.message);
-      return;
-    }
+    rows.forEach(newItem => {
+      const index = barangLama.findIndex(x => String(x.kode).trim() === String(newItem.kode).trim());
+      if (index >= 0) {
+        barangLama[index] = {
+          ...barangLama[index],
+          ...newItem
+        };
+      } else {
+        barangLama.push(newItem);
+      }
+    });
 
-    alert('Import berhasil: ' + dataInsert.length + ' data');
+    localStorage.setItem('data_barang', JSON.stringify(barangLama));
+
+    if (typeof loadDataBarang === 'function') loadDataBarang();
+    if (typeof renderTableBarang === 'function') renderTableBarang();
+    if (typeof tampilkanDataBarang === 'function') tampilkanDataBarang();
+
     fileInput.value = '';
-    await loadProducts();
-    await loadTransactions();
-    renderDashboard();
-    renderProductsTable();
+    setDebug(`Import berhasil. ${rows.length} data diproses.`, false);
+
   } catch (err) {
     console.error(err);
-    alert('Error import: ' + err.message);
+    setDebug('Terjadi error saat import CSV: ' + err.message, true);
   }
 }
-}
-window.addEventListener('load', cekSession);
+    function downloadCSV(filename, rows) {
+      const csvContent = rows.map(row =>
+        row.map(value => {
+          const text = String(value ?? '').replace(/"/g, '""');
+          return `"${text}"`;
+        }).join(',')
+      ).join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function openPrintWindow(title, htmlContent) {
+      const win = window.open('', '', 'width=1200,height=800');
+      win.document.write(`
+        <html>
+          <head>
+            <title>${title}</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 20px; }
+              table { width: 100%; border-collapse: collapse; }
+              th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 12px; }
+              th { background: #f3f4f6; }
+              h2 { margin-bottom: 16px; }
+            </style>
+          </head>
+          <body>
+            <h2>${title}</h2>
+            ${htmlContent}
+          </body>
+        </html>
+      `);
+      win.document.close();
+      win.print();
+    }
+
+
+    function buildStokRows(data) {
+      const rows = [[
+        'Kode Barang',
+        'Nama Barang',
+        'Gudang',
+        'Lokasi',
+        'Letak Barang',
+        'Stok Awal',
+        'Stok Minimum',
+        'Stok Saat Ini',
+        'Status Stok',
+        'Status Data'
+      ]];
+
+      data.forEach(item => {
+        const st = statusStok(item);
+        rows.push([
+          item.kode_barang || '',
+          item.nama_barang || '',
+          item.gudang || '',
+          item.lokasi || '',
+          item.letak_barang || '',
+          item.stok_awal || 0,
+          item.stok_minimum || 0,
+          hitungStokBarang(item.id),
+          st.text,
+          item.status || ''
+        ]);
+      });
+
+      return rows;
+    }
+
+    function renderStokTableForPrint(data) {
+      let html = `
+        <table>
+          <tr>
+            <th>Kode Barang</th>
+            <th>Nama Barang</th>
+            <th>Gudang</th>
+            <th>Lokasi</th>
+            <th>Letak Barang</th>
+            <th>Stok Awal</th>
+            <th>Stok Minimum</th>
+            <th>Stok Saat Ini</th>
+            <th>Status Stok</th>
+            <th>Status Data</th>
+          </tr>
+      `;
+
+      data.forEach(item => {
+        const st = statusStok(item);
+        html += `
+          <tr>
+            <td>${item.kode_barang || ''}</td>
+            <td>${item.nama_barang || ''}</td>
+            <td>${item.gudang || ''}</td>
+            <td>${item.lokasi || ''}</td>
+            <td>${item.letak_barang || ''}</td>
+            <td>${item.stok_awal || 0}</td>
+            <td>${item.stok_minimum || 0}</td>
+            <td>${hitungStokBarang(item.id)}</td>
+            <td>${st.text}</td>
+            <td>${item.status || ''}</td>
+          </tr>
+        `;
+      });
+
+      html += `</table>`;
+      return html;
+    }
+
+    function exportSemuaStokExcel() {
+      const rows = buildStokRows(productsData);
+      downloadCSV('semua-stok-barang.csv', rows);
+      setDebug('Export semua stok barang ke Excel berhasil');
+    }
+
+    function exportFilterStokExcel() {
+      const filtered = getFilteredProducts();
+      const rows = buildStokRows(filtered);
+      downloadCSV('stok-barang-filter.csv', rows);
+      setDebug('Export stok barang sesuai filter ke Excel berhasil');
+    }
+
+    function exportSemuaStokPDF() {
+      const html = renderStokTableForPrint(productsData);
+      openPrintWindow('Semua Stok Barang', html);
+      setDebug('Export semua stok barang ke PDF berhasil');
+    }
+
+    function exportFilterStokPDF() {
+      const filtered = getFilteredProducts();
+      const html = renderStokTableForPrint(filtered);
+      openPrintWindow('Stok Barang Sesuai Filter', html);
+      setDebug('Export stok barang sesuai filter ke PDF berhasil');
+    }
+
+    function exportBarangMasukExcel() {
+      const rows = [['Tanggal','Kode Barang','Nama Barang','Jumlah','Gudang','Lokasi','Keterangan']];
+      transactionsData
+        .filter(trx => trx.jenis_transaksi === 'masuk')
+        .forEach(trx => {
+          const barang = productsData.find(x => x.id === trx.product_id);
+          rows.push([
+            trx.tanggal || '',
+            barang?.kode_barang || '',
+            barang?.nama_barang || '',
+            trx.jumlah || 0,
+            trx.gudang || '',
+            trx.lokasi || '',
+            trx.keterangan || ''
+          ]);
+        });
+      downloadCSV('barang-masuk.csv', rows);
+      setDebug('Export Excel barang masuk berhasil');
+    }
+
+    function exportBarangKeluarExcel() {
+      const rows = [['Tanggal','Kode Barang','Nama Barang','Jumlah','Gudang','Lokasi','Keterangan']];
+      transactionsData
+        .filter(trx => trx.jenis_transaksi === 'keluar')
+        .forEach(trx => {
+          const barang = productsData.find(x => x.id === trx.product_id);
+          rows.push([
+            trx.tanggal || '',
+            barang?.kode_barang || '',
+            barang?.nama_barang || '',
+            trx.jumlah || 0,
+            trx.gudang || '',
+            trx.lokasi || '',
+            trx.keterangan || ''
+          ]);
+        });
+      downloadCSV('barang-keluar.csv', rows);
+      setDebug('Export Excel barang keluar berhasil');
+    }
+
+    function exportOpnameExcel() {
+      const rows = [['Nama Barang','Gudang','Lokasi','Stok Sistem','Stok Fisik','Selisih','Status','Keterangan','Petugas']];
+      opnamesData.forEach(op => {
+        const barang = productsData.find(x => x.id === op.product_id);
+        rows.push([
+          barang?.nama_barang || '',
+          op.gudang || '',
+          op.lokasi || '',
+          op.stok_sistem || 0,
+          op.stok_fisik || 0,
+          op.selisih || 0,
+          op.status || '',
+          op.keterangan || '',
+          op.petugas_opname || ''
+        ]);
+      });
+      downloadCSV('opname.csv', rows);
+      setDebug('Export Excel opname berhasil');
+    }
+
+    function exportBarangMasukPDF() {
+      const rows = transactionsData.filter(trx => trx.jenis_transaksi === 'masuk');
+      let html = '<table><tr><th>Tanggal</th><th>Kode</th><th>Nama Barang</th><th>Jumlah</th><th>Gudang</th><th>Lokasi</th><th>Keterangan</th></tr>';
+      rows.forEach(trx => {
+        const barang = productsData.find(x => x.id === trx.product_id);
+        html += `<tr>
+          <td>${trx.tanggal || ''}</td>
+          <td>${barang?.kode_barang || ''}</td>
+          <td>${barang?.nama_barang || ''}</td>
+          <td>${trx.jumlah || 0}</td>
+          <td>${trx.gudang || ''}</td>
+          <td>${trx.lokasi || ''}</td>
+          <td>${trx.keterangan || ''}</td>
+        </tr>`;
+      });
+      html += '</table>';
+      openPrintWindow('Barang Masuk', html);
+    }
+
+    function exportBarangKeluarPDF() {
+      const rows = transactionsData.filter(trx => trx.jenis_transaksi === 'keluar');
+      let html = '<table><tr><th>Tanggal</th><th>Kode</th><th>Nama Barang</th><th>Jumlah</th><th>Gudang</th><th>Lokasi</th><th>Keterangan</th></tr>';
+      rows.forEach(trx => {
+        const barang = productsData.find(x => x.id === trx.product_id);
+        html += `<tr>
+          <td>${trx.tanggal || ''}</td>
+          <td>${barang?.kode_barang || ''}</td>
+          <td>${barang?.nama_barang || ''}</td>
+          <td>${trx.jumlah || 0}</td>
+          <td>${trx.gudang || ''}</td>
+          <td>${trx.lokasi || ''}</td>
+          <td>${trx.keterangan || ''}</td>
+        </tr>`;
+      });
+      html += '</table>';
+      openPrintWindow('Barang Keluar', html);
+    }
+
+    function exportOpnamePDF() {
+      let html = '<table><tr><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Stok Sistem</th><th>Stok Fisik</th><th>Selisih</th><th>Status</th><th>Keterangan</th><th>Petugas</th></tr>';
+      opnamesData.forEach(op => {
+        const barang = productsData.find(x => x.id === op.product_id);
+        html += `<tr>
+          <td>${barang?.nama_barang || ''}</td>
+          <td>${op.gudang || ''}</td>
+          <td>${op.lokasi || ''}</td>
+          <td>${op.stok_sistem || 0}</td>
+          <td>${op.stok_fisik || 0}</td>
+          <td>${op.selisih || 0}</td>
+          <td>${op.status || ''}</td>
+          <td>${op.keterangan || ''}</td>
+          <td>${op.petugas_opname || ''}</td>
+        </tr>`;
+      });
+      html += '</table>';
+      openPrintWindow('Opname', html);
+    }
+
+    window.addEventListener('load', cekSession);
+
 </script>
 </body>
 </html>
