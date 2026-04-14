@@ -173,6 +173,7 @@
             <strong id="sessionNama">-</strong><br>
             <span id="sessionRole" class="muted">-</span>
           </div>
+          <button class="btn danger" onclick="hapusBarangTerpilih()">Hapus Terpilih</button>
           <div class="actions">
             <button class="btn secondary" onclick="tesKoneksi()">Tes Koneksi</button>
             <button class="btn secondary" onclick="loadSemua()">Refresh Semua Data</button>
@@ -685,37 +686,54 @@ async function loadProducts() {
       });
     }
 
-    function renderProductsTable() {
-      const rows = getFilteredProducts();
+   function renderProductsTable() {
+  const rows = getFilteredProducts();
 
-      let html = '<table><tr><th>Kode</th><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Letak</th><th>Stok Awal</th><th>Stok Minimum</th><th>Stok Saat Ini</th><th>Status Stok</th><th>Status Data</th>';
-      if (isAdmin()) html += '<th>Aksi</th>';
-      html += '</tr>';
+  let html = '<table><tr>';
 
-      rows.forEach(item => {
-        const st = statusStok(item);
-        html += `<tr>
-          <td>${item.kode_barang || ''}</td>
-          <td>${item.nama_barang || ''}</td>
-          <td>${item.gudang || ''}</td>
-          <td>${item.lokasi || ''}</td>
-          <td>${item.letak_barang || ''}</td>
-          <td>${item.stok_awal || 0}</td>
-          <td>${item.stok_minimum || 0}</td>
-          <td>${hitungStokBarang(item.id)}</td>
-          <td class="${st.cls}">${st.text}</td>
-          <td>${item.status || ''}</td>`;
-        if (isAdmin()) {
-          html += `<td>
-            <button class="btn warning" onclick="editBarang('${item.id}')">Edit</button>
-            <button class="btn danger" onclick="hapusBarang('${item.id}')">Hapus</button>
-          </td>`;
-        }
-        html += '</tr>';
-      });
-      html += '</table>';
-      document.getElementById('productsTableWrap').innerHTML = html;
+  if (isAdmin()) {
+    html += '<th><input type="checkbox" id="check_all_barang" onclick="toggleCheckAllBarang(this)"></th>';
+  }
+
+  html += '<th>Kode</th><th>Nama Barang</th><th>Gudang</th><th>Lokasi</th><th>Letak</th><th>Stok Awal</th><th>Stok Minimum</th><th>Stok Saat Ini</th><th>Status Stok</th><th>Status Data</th>';
+
+  if (isAdmin()) html += '<th>Aksi</th>';
+  html += '</tr>';
+
+  rows.forEach(item => {
+    const st = statusStok(item);
+    html += '<tr>';
+
+    if (isAdmin()) {
+      html += `<td><input type="checkbox" class="check_barang" value="${item.id}" onclick="syncCheckAllBarang()"></td>`;
     }
+
+    html += `
+      <td>${item.kode_barang || ''}</td>
+      <td>${item.nama_barang || ''}</td>
+      <td>${item.gudang || ''}</td>
+      <td>${item.lokasi || ''}</td>
+      <td>${item.letak_barang || ''}</td>
+      <td>${item.stok_awal || 0}</td>
+      <td>${item.stok_minimum || 0}</td>
+      <td>${hitungStokBarang(item.id)}</td>
+      <td class="${st.cls}">${st.text}</td>
+      <td>${item.status || ''}</td>
+    `;
+
+    if (isAdmin()) {
+      html += `<td>
+        <button class="btn warning" onclick="editBarang('${item.id}')">Edit</button>
+        <button class="btn danger" onclick="hapusBarang('${item.id}')">Hapus</button>
+      </td>`;
+    }
+
+    html += '</tr>';
+  });
+
+  html += '</table>';
+  document.getElementById('productsTableWrap').innerHTML = html;
+}
 
     function renderKartuStok() {
       const fNama = (document.getElementById('filter_kartu_nama').value || '').toLowerCase();
@@ -1456,8 +1474,50 @@ async function importBarangCSV() {
       openPrintWindow('Opname', html);
     }
 
-    window.addEventListener('load', cekSession);
+window.addEventListener('load', cekSession);
 
+function toggleCheckAllBarang(source) {
+  const allChecks = document.querySelectorAll('.check_barang');
+  allChecks.forEach(cb => cb.checked = source.checked);
+}
+
+function syncCheckAllBarang() {
+  const allChecks = document.querySelectorAll('.check_barang');
+  const checked = document.querySelectorAll('.check_barang:checked');
+  const checkAll = document.getElementById('check_all_barang');
+
+  if (!checkAll) return;
+  checkAll.checked = allChecks.length > 0 && checked.length === allChecks.length;
+}
+
+async function hapusBarangTerpilih() {
+  if (!isAdmin()) return setDebug('Hanya admin yang bisa hapus barang.', true);
+
+  const selected = [...document.querySelectorAll('.check_barang:checked')]
+    .map(el => el.value);
+
+  if (!selected.length) {
+    return setDebug('Pilih data dulu.', true);
+  }
+
+  if (!confirm(`Hapus ${selected.length} data?`)) return;
+
+  const { error } = await client
+    .from('products')
+    .delete()
+    .in('id', selected);
+
+  if (error) {
+    return setDebug('Gagal hapus: ' + error.message, true);
+  }
+
+  setDebug('Berhasil hapus data terpilih');
+  await loadProducts();
+  await loadTransactions();
+  await loadOpnames();
+  renderProductsTable();
+  renderDashboard();
+}
 </script>
 </body>
 </html>
