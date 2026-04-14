@@ -183,7 +183,8 @@
         <div id="debug" class="result muted"></div>
       </div>
 
-      <div class="menu">
+<div class="menu">
+        <button id="tab-btn-laporan" onclick="showTab('laporan')">Laporan</button>
         <button id="tab-btn-dashboard" class="active" onclick="showTab('dashboard')">Dashboard</button>
         <button id="tab-btn-barang" onclick="showTab('barang')">Data Barang</button>
         <button id="tab-btn-masuk" onclick="showTab('masuk')">Barang Masuk</button>
@@ -412,6 +413,38 @@
           <div id="riwayatOpnameWrap"></div>
         </div>
       </div>
+      <div id="tab-laporan" class="tab-content hidden">
+  <div class="card">
+    <h2>Laporan Transaksi</h2>
+
+    <div class="grid-3">
+      <div class="field">
+        <label>Dari Tanggal</label>
+        <input type="date" id="laporan_dari">
+      </div>
+      <div class="field">
+        <label>Sampai Tanggal</label>
+        <input type="date" id="laporan_sampai">
+      </div>
+      <div class="field">
+        <label>Jenis</label>
+        <select id="laporan_jenis">
+          <option value="">Semua</option>
+          <option value="masuk">Barang Masuk</option>
+          <option value="keluar">Barang Keluar</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" onclick="renderLaporan()">Tampilkan</button>
+      <button class="btn secondary" onclick="exportLaporanExcel()">Export Excel</button>
+      <button class="btn secondary" onclick="exportLaporanPDF()">Export PDF</button>
+    </div>
+
+    <div id="laporanWrap"></div>
+  </div>
+</div>
     </div>
   </div>
 
@@ -1517,6 +1550,114 @@ async function hapusBarangTerpilih() {
   await loadOpnames();
   renderProductsTable();
   renderDashboard();
+}
+    function renderLaporan() {
+  const dari = document.getElementById('laporan_dari').value;
+  const sampai = document.getElementById('laporan_sampai').value;
+  const jenis = document.getElementById('laporan_jenis').value;
+
+  let rows = [...transactionsData];
+
+  if (jenis) {
+    rows = rows.filter(x => x.jenis_transaksi === jenis);
+  }
+
+  if (dari) {
+    rows = rows.filter(x => (x.tanggal || '') >= dari);
+  }
+
+  if (sampai) {
+    rows = rows.filter(x => (x.tanggal || '') <= sampai);
+  }
+
+  let html = `
+    <table>
+      <tr>
+        <th>Tanggal</th>
+        <th>Kode</th>
+        <th>Nama Barang</th>
+        <th>Jenis</th>
+        <th>Jumlah</th>
+        <th>Gudang</th>
+        <th>Lokasi</th>
+        <th>Keterangan</th>
+      </tr>
+  `;
+
+  rows.forEach(trx => {
+    const barang = productsData.find(x => x.id === trx.product_id);
+
+    html += `
+      <tr>
+        <td>${trx.tanggal || ''}</td>
+        <td>${barang?.kode_barang || ''}</td>
+        <td>${barang?.nama_barang || '-'}</td>
+        <td>${trx.jenis_transaksi || ''}</td>
+        <td>${trx.jumlah || 0}</td>
+        <td>${trx.gudang || ''}</td>
+        <td>${trx.lokasi || ''}</td>
+        <td>${trx.keterangan || ''}</td>
+      </tr>
+    `;
+  });
+
+  html += '</table>';
+  document.getElementById('laporanWrap').innerHTML = html;
+}
+
+function exportLaporanExcel() {
+  const dari = document.getElementById('laporan_dari').value;
+  const sampai = document.getElementById('laporan_sampai').value;
+  const jenis = document.getElementById('laporan_jenis').value;
+
+  let rowsData = [...transactionsData];
+
+  if (jenis) {
+    rowsData = rowsData.filter(x => x.jenis_transaksi === jenis);
+  }
+
+  if (dari) {
+    rowsData = rowsData.filter(x => (x.tanggal || '') >= dari);
+  }
+
+  if (sampai) {
+    rowsData = rowsData.filter(x => (x.tanggal || '') <= sampai);
+  }
+
+  const rows = [[
+    'Tanggal',
+    'Kode',
+    'Nama Barang',
+    'Jenis',
+    'Jumlah',
+    'Gudang',
+    'Lokasi',
+    'Keterangan'
+  ]];
+
+  rowsData.forEach(trx => {
+    const barang = productsData.find(x => x.id === trx.product_id);
+
+    rows.push([
+      trx.tanggal || '',
+      barang?.kode_barang || '',
+      barang?.nama_barang || '',
+      trx.jenis_transaksi || '',
+      trx.jumlah || 0,
+      trx.gudang || '',
+      trx.lokasi || '',
+      trx.keterangan || ''
+    ]);
+  });
+
+  downloadCSV('laporan-transaksi.csv', rows);
+  setDebug('Export laporan Excel berhasil');
+}
+
+function exportLaporanPDF() {
+  const html = document.getElementById('laporanWrap').innerHTML || '<p>Belum ada data laporan ditampilkan.</p>';
+  openPrintWindow('Laporan Transaksi', html);
+  setDebug('Export laporan PDF berhasil');
 }
 </script>
 </body>
