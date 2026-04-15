@@ -888,20 +888,21 @@ async function simpanReturBarang() {
   const lokasi = lokasiInput || barang.lokasi || '';
 
   // retur masuk = masuk ke stok retur, bukan stok utama
-  if (jenisRetur === 'retur_masuk') {
-    const payload = {
-      product_id: productId,
-      jenis_transaksi: 'masuk',
-      jumlah: qty,
-      gudang,
-      lokasi,
-      kategori_stok: 'retur',
-      jenis_retur: jenisRetur,
-      kondisi_barang: kondisiBarang,
-      partner: partner,
-      keterangan: `RETUR_MASUK | ${noRetur} | asal:${asalRetur} | alasan:${alasanRetur || '-'} | ${keteranganInput || '-'}`,
-      created_by: currentUser?.id || null
-    };
+  const payload = {
+  trx_no: noRetur,
+  trx_date: tanggal,
+  trx_type: 'masuk',
+  product_id: productId,
+  kategori_stok: 'retur',
+  jumlah: qty,
+  gudang,
+  lokasi,
+  jenis_retur: jenisRetur,
+  kondisi_barang: kondisiBarang,
+  partner: partner,
+  keterangan: `RETUR_MASUK | ${noRetur} | asal:${asalRetur} | alasan:${alasanRetur || '-'} | ${keteranganInput || '-'}`,
+  created_by: currentUser?.id || null
+};
 
     const { error } = await client.from('stock_transactions').insert([payload]);
     if (error) return setDebug('Gagal simpan retur masuk: ' + error.message, true);
@@ -915,8 +916,10 @@ async function simpanReturBarang() {
     }
 
 const payload = {
+  trx_no: noRetur,
+  trx_date: tanggal,
+  trx_type: 'masuk',
   product_id: productId,
-  jenis_transaksi: 'keluar',
   kategori_stok: 'retur',
   jumlah: qty,
   gudang,
@@ -924,7 +927,7 @@ const payload = {
   jenis_retur: jenisRetur,
   kondisi_barang: kondisiBarang,
   partner: partner,
-  keterangan: `RETUR_KELUAR | ${noRetur} | asal:${asalRetur} | alasan:${alasanRetur || '-'} | ${keteranganInput || '-'}`,
+  keterangan: `RETUR_MASUK | ${noRetur} | asal:${asalRetur} | alasan:${alasanRetur || '-'} | ${keteranganInput || '-'}`,
   created_by: currentUser?.id || null
 };
     const { error } = await client.from('stock_transactions').insert([payload]);
@@ -1309,20 +1312,20 @@ function renderReturTable() {
   const supplier = document.getElementById('masuk_supplier').value.trim();
 
 const payload = {
-  product_id: document.getElementById('masuk_product').value,
-  jenis_transaksi: 'masuk',
-  kategori_stok: 'utama',
-  jumlah: Number(document.getElementById('masuk_jumlah').value || 0),
-  gudang: document.getElementById('masuk_gudang').value,
-  lokasi: document.getElementById('masuk_lokasi').value,
-  keterangan:
-    'Supplier: ' + supplier +
-    (document.getElementById('masuk_keterangan').value
-      ? ' | ' + document.getElementById('masuk_keterangan').value
-      : ''),
+  trx_no: noRetur,
+  trx_date: tanggal,
+  trx_type: 'masuk',
+  product_id: productId,
+  kategori_stok: 'retur',
+  jumlah: qty,
+  gudang,
+  lokasi,
+  jenis_retur: jenisRetur,
+  kondisi_barang: kondisiBarang,
+  partner: partner,
+  keterangan: 'RETUR MASUK',
   created_by: currentUser?.id || null
 };
-
   const barang = productsData.find(x => x.id === payload.product_id);
   if (!barang) return setDebug('Barang belum dipilih.', true);
   if (!supplier) return setDebug('Supplier wajib diisi.', true);
