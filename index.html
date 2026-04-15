@@ -182,15 +182,15 @@
         </div>
         <div id="debug" class="result muted"></div>
       </div>
-
 <div class="menu">
-        <button id="tab-btn-laporan" onclick="showTab('laporan')">Laporan</button>
         <button id="tab-btn-dashboard" class="active" onclick="showTab('dashboard')">Dashboard</button>
         <button id="tab-btn-barang" onclick="showTab('barang')">Data Barang</button>
         <button id="tab-btn-masuk" onclick="showTab('masuk')">Barang Masuk</button>
         <button id="tab-btn-keluar" onclick="showTab('keluar')">Barang Keluar</button>
         <button id="tab-btn-kartu" onclick="showTab('kartu')">Kartu Stok</button>
         <button id="tab-btn-opname" onclick="showTab('opname')">Opname</button>
+        <button id="tab-btn-laporan" onclick="showTab('laporan')">Laporan</button>
+        <button id="tab-btn-acrylic" onclick="showTab('acrylic')">Acrylic</button>
       </div>
 
       <div id="tab-dashboard" class="tab-content">
@@ -413,7 +413,7 @@
           <div id="riwayatOpnameWrap"></div>
         </div>
       </div>
-      <div id="tab-laporan" class="tab-content hidden">
+    <div id="tab-laporan" class="tab-content hidden">
   <div class="card">
     <h2>Laporan Transaksi</h2>
 
@@ -422,10 +422,12 @@
         <label>Dari Tanggal</label>
         <input type="date" id="laporan_dari">
       </div>
+
       <div class="field">
         <label>Sampai Tanggal</label>
         <input type="date" id="laporan_sampai">
       </div>
+
       <div class="field">
         <label>Jenis</label>
         <select id="laporan_jenis">
@@ -445,9 +447,61 @@
     <div id="laporanWrap"></div>
   </div>
 </div>
+      <div id="tab-acrylic" class="tab-content hidden">
+  <div class="card">
+    <h2>Pengiriman Acrylic</h2>
+
+    <div class="grid-3">
+      <div class="field">
+        <label>No Kirim</label>
+        <input id="akr_no" readonly>
+      </div>
+
+      <div class="field">
+        <label>Produk</label>
+        <input id="akr_produk" placeholder="Nama acrylic">
+      </div>
+
+      <div class="field">
+        <label>Ukuran</label>
+        <input id="akr_ukuran" placeholder="120 x 80 cm">
+      </div>
+
+      <div class="field">
+        <label>Qty</label>
+        <input id="akr_qty" type="number">
+      </div>
+
+      <div class="field">
+        <label>Tujuan</label>
+        <input id="akr_tujuan">
+      </div>
+
+      <div class="field">
+        <label>Supir</label>
+        <input id="akr_supir">
+      </div>
+
+      <div class="field" style="grid-column: span 3;">
+        <label>Catatan</label>
+        <input id="akr_catatan">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" onclick="simpanAcrylic()">Kirim Acrylic</button>
+      <button class="btn secondary" onclick="resetAcrylic()">Reset</button>
     </div>
   </div>
 
+  <div class="card">
+    <h2>Daftar Pengiriman</h2>
+    <div id="acrylicWrap"></div>
+  </div>
+</div>
+    </div>
+  </div>
+  
   <script>
     const SUPABASE_URL = 'https://dvpyetgzpkmfqbjboihz.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2cHlldGd6cGttZnFiamJvaWh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyNzk4MDEsImV4cCI6MjA5MDg1NTgwMX0.FNKl_4SjPrfyHHyN3RNoRXVKAL2_1VUCtRGMh7LjQwU';
@@ -1659,6 +1713,87 @@ function exportLaporanPDF() {
   openPrintWindow('Laporan Transaksi', html);
   setDebug('Export laporan PDF berhasil');
 }
+    let acrylicData = [];
+
+function generateNoAcrylic() {
+  return 'AKR-' + String(acrylicData.length + 1).padStart(3, '0');
+}
+
+function resetAcrylic() {
+  document.getElementById('akr_no').value = generateNoAcrylic();
+  document.getElementById('akr_produk').value = '';
+  document.getElementById('akr_ukuran').value = '';
+  document.getElementById('akr_qty').value = '';
+  document.getElementById('akr_tujuan').value = '';
+  document.getElementById('akr_supir').value = '';
+  document.getElementById('akr_catatan').value = '';
+}
+
+function simpanAcrylic() {
+  const item = {
+    no: document.getElementById('akr_no').value,
+    tanggal: new Date().toLocaleString(),
+    produk: document.getElementById('akr_produk').value,
+    ukuran: document.getElementById('akr_ukuran').value,
+    qty: Number(document.getElementById('akr_qty').value || 0),
+    tujuan: document.getElementById('akr_tujuan').value,
+    supir: document.getElementById('akr_supir').value,
+    catatan: document.getElementById('akr_catatan').value,
+    status: 'Dalam Perjalanan'
+  };
+
+  if (!item.produk) return setDebug('Produk acrylic wajib diisi.', true);
+  if (item.qty <= 0) return setDebug('Qty harus lebih dari 0.', true);
+
+  acrylicData.unshift(item);
+
+  setDebug('Pengiriman acrylic berhasil dibuat.');
+  renderAcrylic();
+  resetAcrylic();
+}
+
+function renderAcrylic() {
+  let html = `
+    <table>
+      <tr>
+        <th>No Kirim</th>
+        <th>Tanggal</th>
+        <th>Produk</th>
+        <th>Ukuran</th>
+        <th>Qty</th>
+        <th>Tujuan</th>
+        <th>Supir</th>
+        <th>Status</th>
+      </tr>
+  `;
+
+  acrylicData.forEach(x => {
+    html += `
+      <tr>
+        <td>${x.no}</td>
+        <td>${x.tanggal}</td>
+        <td>${x.produk}</td>
+        <td>${x.ukuran}</td>
+        <td>${x.qty}</td>
+        <td>${x.tujuan}</td>
+        <td>${x.supir}</td>
+        <td>${x.status}</td>
+      </tr>
+    `;
+  });
+
+  html += '</table>';
+  document.getElementById('acrylicWrap').innerHTML = html;
+}
+
+const oldCekSession = cekSession;
+cekSession = async function() {
+  await oldCekSession();
+  if (document.getElementById('akr_no')) {
+    resetAcrylic();
+    renderAcrylic();
+  }
+};
 </script>
 </body>
 </html>
