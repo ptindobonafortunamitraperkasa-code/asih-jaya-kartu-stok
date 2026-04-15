@@ -637,12 +637,15 @@ async function loadSemua() {
   await loadProducts();
   await loadTransactions();
   await loadOpnames();
+  await loadAcrylic();
 
   renderProductsTable();
   renderKartuStok();
   renderRiwayatOpname();
   renderDashboard();
   resetFormBarang();
+  resetAcrylic();
+  resetPenerimaanAcrylic();
 
   isiDropdownBarangMasuk();
   isiDropdownBarangKeluar();
@@ -1748,8 +1751,24 @@ function exportLaporanPDF() {
 let acrylicData = [];
 let acrylicTerimaIndex = null;
 
+async function loadAcrylic() {
+  const { data, error } = await client
+    .from('acrylic_deliveries')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    setDebug('Gagal load data acrylic: ' + error.message, true);
+    return;
+  }
+
+  acrylicData = data || [];
+  renderAcrylic();
+}
+
 function generateNoAcrylic() {
-  return 'AKR-' + String(acrylicData.length + 1).padStart(3, '0');
+  const nextNum = acrylicData.length + 1;
+  return 'AKR-' + String(nextNum).padStart(3, '0');
 }
 
 function resetAcrylic() {
@@ -1770,10 +1789,9 @@ function resetPenerimaanAcrylic() {
   document.getElementById('akr_terima_catatan').value = '';
 }
 
-function simpanAcrylic() {
+async function simpanAcrylic() {
   const item = {
-    no: document.getElementById('akr_no').value,
-    tanggal: new Date().toLocaleString('id-ID'),
+    no_kirim: document.getElementById('akr_no').value.trim(),
     produk: document.getElementById('akr_produk').value.trim(),
     ukuran: document.getElementById('akr_ukuran').value.trim(),
     qty: Number(document.getElementById('akr_qty').value || 0),
@@ -1781,21 +1799,23 @@ function simpanAcrylic() {
     supir: document.getElementById('akr_supir').value.trim(),
     catatan: document.getElementById('akr_catatan').value.trim(),
     status: 'Dalam Perjalanan',
-    nama_penerima: '',
-    catatan_penerimaan: '',
-    foto_bukti: '',
-    tanggal_terima: ''
+    created_by: currentUser?.id || null
   };
 
+  if (!item.no_kirim) return setDebug('No kirim wajib ada.', true);
   if (!item.produk) return setDebug('Produk acrylic wajib diisi.', true);
   if (item.qty <= 0) return setDebug('Qty harus lebih dari 0.', true);
   if (!item.tujuan) return setDebug('Tujuan wajib diisi.', true);
   if (!item.supir) return setDebug('Supir wajib diisi.', true);
 
-  acrylicData.unshift(item);
+  const { error } = await client.from('acrylic_deliveries').insert([item]);
 
-  setDebug('Pengiriman acrylic berhasil dibuat.');
-  renderAcrylic();
+  if (error) {
+    return setDebug('Gagal simpan pengiriman acrylic: ' + error.message, true);
+  }
+
+  setDebug('Pengiriman acrylic berhasil disimpan.');
+  await loadAcrylic();
   resetAcrylic();
 }
 
@@ -1804,7 +1824,7 @@ function pilihTerimaAcrylic(index) {
   if (!item) return;
 
   acrylicTerimaIndex = index;
-  document.getElementById('akr_terima_no').value = item.no || '';
+  document.getElementById('akr_terima_no').value = item.no_kirim || '';
   document.getElementById('akr_terima_nama').value = item.nama_penerima || '';
   document.getElementById('akr_terima_catatan').value = item.catatan_penerimaan || '';
 
@@ -1812,71 +1832,79 @@ function pilihTerimaAcrylic(index) {
   if (box) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-function simpanPenerimaanAcrylic() {
+async function simpanPenerimaanAcrylic() {
   if (acrylicTerimaIndex === null) {
     return setDebug('Pilih dulu data pengiriman yang mau diterima.', true);
   }
 
-  const namaPenerima = document.getElementById('akr_terima_nama').value.trim();
-  const catatan = document.getElementById('akr_terima_catatan').value.trim();
-  const fileInput = document.getElementById('akr_terima_foto');
   const item = acrylicData[acrylicTerimaIndex];
+  if (!item) return setDebug('Data acrylic tidak ditemukan.', true);
 
-  if (!item) {
-    return setDebug('Data pengiriman tidak ditemukan.', true);
-  }
+  const namaPenerima = document.getElementById('akr_terima_nama').value.trim();
+  const catatanPenerimaan = document.getElementById('akr_terima_catatan').value.trim();
+  const fileInput = document.getElementById('akr_terima_foto');
+  const file = fileInput?.files?.[0];
 
   if (!namaPenerima) {
     return setDebug('Nama penerima wajib diisi.', true);
   }
 
-  const simpanFinal = (fotoBase64 = item.foto_bukti || '') => {
-    item.nama_penerima = namaPenerima;
-    item.catatan_penerimaan = catatan;
-    item.foto_bukti = fotoBase64;
-    item.tanggal_terima = new Date().toLocaleString('id-ID');
-    item.status = 'Diterima';
+  let fotoPath = item.foto_bukti_url || '';
 
-    renderAcrylic();
-    resetPenerimaanAcrylic();
-    setDebug('Penerimaan acrylic berhasil disimpan.');
+  if (file) {
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const safeNo = (item.no_kirim || 'akr').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `${safeNo}-${Date.now()}.${ext}`;
+    const filePath = `bukti/${fileName}`;
+
+    const { error: uploadError } = await client.storage
+      .from('acrylic-bukti')
+      .upload(filePath, file, { upsert: true });
+
+    if (uploadError) {
+      return setDebug('Gagal upload foto bukti: ' + uploadError.message, true);
+    }
+
+    fotoPath = filePath;
+  }
+
+  const payload = {
+    nama_penerima: namaPenerima,
+    catatan_penerimaan: catatanPenerimaan,
+    foto_bukti_url: fotoPath,
+    tanggal_terima: new Date().toISOString(),
+    status: 'Diterima'
   };
 
-  if (fileInput.files && fileInput.files[0]) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      simpanFinal(e.target.result);
-    };
-    reader.readAsDataURL(fileInput.files[0]);
-  } else {
-    simpanFinal();
+  const { error } = await client
+    .from('acrylic_deliveries')
+    .update(payload)
+    .eq('id', item.id);
+
+  if (error) {
+    return setDebug('Gagal simpan penerimaan acrylic: ' + error.message, true);
   }
+
+  setDebug('Penerimaan acrylic berhasil disimpan.');
+  resetPenerimaanAcrylic();
+  await loadAcrylic();
 }
 
-function lihatFotoAcrylic(index) {
+async function lihatFotoAcrylic(index) {
   const item = acrylicData[index];
-  if (!item || !item.foto_bukti) {
+  if (!item || !item.foto_bukti_url) {
     return setDebug('Foto bukti belum ada.', true);
   }
 
-  const win = window.open('', '_blank');
-  win.document.write(`
-    <html>
-      <head>
-        <title>Foto Bukti Acrylic</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 20px; text-align: center; background: #f8fafc; }
-          img { max-width: 100%; height: auto; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.15); }
-        </style>
-      </head>
-      <body>
-        <h2>Foto Bukti Penerimaan</h2>
-        <p><b>No Kirim:</b> ${item.no}</p>
-        <img src="${item.foto_bukti}" alt="Foto Bukti">
-      </body>
-    </html>
-  `);
-  win.document.close();
+  const { data, error } = await client.storage
+    .from('acrylic-bukti')
+    .createSignedUrl(item.foto_bukti_url, 60);
+
+  if (error) {
+    return setDebug('Gagal membuka foto bukti: ' + error.message, true);
+  }
+
+  window.open(data.signedUrl, '_blank');
 }
 
 function renderAcrylic() {
@@ -1905,10 +1933,13 @@ function renderAcrylic() {
     `;
   } else {
     acrylicData.forEach((x, index) => {
+      const tanggal = x.tanggal ? new Date(x.tanggal).toLocaleString('id-ID') : '';
+      const tanggalTerima = x.tanggal_terima ? new Date(x.tanggal_terima).toLocaleString('id-ID') : '-';
+
       html += `
         <tr>
-          <td>${x.no || ''}</td>
-          <td>${x.tanggal || ''}</td>
+          <td>${x.no_kirim || ''}</td>
+          <td>${tanggal}</td>
           <td>${x.produk || ''}</td>
           <td>${x.ukuran || ''}</td>
           <td>${x.qty || 0}</td>
@@ -1916,16 +1947,12 @@ function renderAcrylic() {
           <td>${x.supir || ''}</td>
           <td class="${x.status === 'Diterima' ? 'status-ok' : 'status-warn'}">${x.status || ''}</td>
           <td>${x.nama_penerima || '-'}</td>
-          <td>${x.tanggal_terima || '-'}</td>
+          <td>${tanggalTerima}</td>
           <td>
             ${
               x.status === 'Diterima'
-                ? `
-                  <button class="btn secondary" onclick="lihatFotoAcrylic(${index})">Lihat Foto</button>
-                `
-                : `
-                  <button class="btn" onclick="pilihTerimaAcrylic(${index})">Terima</button>
-                `
+                ? `<button class="btn secondary" onclick="lihatFotoAcrylic(${index})">Lihat Foto</button>`
+                : `<button class="btn" onclick="pilihTerimaAcrylic(${index})">Terima</button>`
             }
           </td>
         </tr>
@@ -1936,16 +1963,6 @@ function renderAcrylic() {
   html += '</table>';
   document.getElementById('acrylicWrap').innerHTML = html;
 }
-
-const oldCekSession = cekSession;
-cekSession = async function() {
-  await oldCekSession();
-  if (document.getElementById('akr_no')) {
-    resetAcrylic();
-    resetPenerimaanAcrylic();
-    renderAcrylic();
-  }
-};
 </script>
 </body>
 </html>
