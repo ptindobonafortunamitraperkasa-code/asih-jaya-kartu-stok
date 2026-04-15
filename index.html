@@ -447,7 +447,7 @@
     <div id="laporanWrap"></div>
   </div>
 </div>
-      <div id="tab-acrylic" class="tab-content hidden">
+    <div id="tab-acrylic" class="tab-content hidden">
   <div class="card">
     <h2>Pengiriman Acrylic</h2>
 
@@ -491,6 +491,37 @@
     <div class="actions">
       <button class="btn" onclick="simpanAcrylic()">Kirim Acrylic</button>
       <button class="btn secondary" onclick="resetAcrylic()">Reset</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Penerimaan Acrylic</h2>
+
+    <div class="grid-3">
+      <div class="field">
+        <label>No Kirim</label>
+        <input id="akr_terima_no" readonly>
+      </div>
+
+      <div class="field">
+        <label>Nama Penerima</label>
+        <input id="akr_terima_nama" placeholder="Nama penerima">
+      </div>
+
+      <div class="field">
+        <label>Foto Bukti</label>
+        <input id="akr_terima_foto" type="file" accept="image/*" capture="environment">
+      </div>
+
+      <div class="field" style="grid-column: span 3;">
+        <label>Catatan Penerimaan</label>
+        <input id="akr_terima_catatan" placeholder="Barang diterima baik / ada catatan kerusakan">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" onclick="simpanPenerimaanAcrylic()">Simpan Penerimaan</button>
+      <button class="btn secondary" onclick="resetPenerimaanAcrylic()">Reset</button>
     </div>
   </div>
 
@@ -1713,7 +1744,9 @@ function exportLaporanPDF() {
   openPrintWindow('Laporan Transaksi', html);
   setDebug('Export laporan PDF berhasil');
 }
-    let acrylicData = [];
+
+let acrylicData = [];
+let acrylicTerimaIndex = null;
 
 function generateNoAcrylic() {
   return 'AKR-' + String(acrylicData.length + 1).padStart(3, '0');
@@ -1729,27 +1762,121 @@ function resetAcrylic() {
   document.getElementById('akr_catatan').value = '';
 }
 
+function resetPenerimaanAcrylic() {
+  acrylicTerimaIndex = null;
+  document.getElementById('akr_terima_no').value = '';
+  document.getElementById('akr_terima_nama').value = '';
+  document.getElementById('akr_terima_foto').value = '';
+  document.getElementById('akr_terima_catatan').value = '';
+}
+
 function simpanAcrylic() {
   const item = {
     no: document.getElementById('akr_no').value,
-    tanggal: new Date().toLocaleString(),
-    produk: document.getElementById('akr_produk').value,
-    ukuran: document.getElementById('akr_ukuran').value,
+    tanggal: new Date().toLocaleString('id-ID'),
+    produk: document.getElementById('akr_produk').value.trim(),
+    ukuran: document.getElementById('akr_ukuran').value.trim(),
     qty: Number(document.getElementById('akr_qty').value || 0),
-    tujuan: document.getElementById('akr_tujuan').value,
-    supir: document.getElementById('akr_supir').value,
-    catatan: document.getElementById('akr_catatan').value,
-    status: 'Dalam Perjalanan'
+    tujuan: document.getElementById('akr_tujuan').value.trim(),
+    supir: document.getElementById('akr_supir').value.trim(),
+    catatan: document.getElementById('akr_catatan').value.trim(),
+    status: 'Dalam Perjalanan',
+    nama_penerima: '',
+    catatan_penerimaan: '',
+    foto_bukti: '',
+    tanggal_terima: ''
   };
 
   if (!item.produk) return setDebug('Produk acrylic wajib diisi.', true);
   if (item.qty <= 0) return setDebug('Qty harus lebih dari 0.', true);
+  if (!item.tujuan) return setDebug('Tujuan wajib diisi.', true);
+  if (!item.supir) return setDebug('Supir wajib diisi.', true);
 
   acrylicData.unshift(item);
 
   setDebug('Pengiriman acrylic berhasil dibuat.');
   renderAcrylic();
   resetAcrylic();
+}
+
+function pilihTerimaAcrylic(index) {
+  const item = acrylicData[index];
+  if (!item) return;
+
+  acrylicTerimaIndex = index;
+  document.getElementById('akr_terima_no').value = item.no || '';
+  document.getElementById('akr_terima_nama').value = item.nama_penerima || '';
+  document.getElementById('akr_terima_catatan').value = item.catatan_penerimaan || '';
+
+  const box = document.getElementById('akr_terima_no');
+  if (box) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function simpanPenerimaanAcrylic() {
+  if (acrylicTerimaIndex === null) {
+    return setDebug('Pilih dulu data pengiriman yang mau diterima.', true);
+  }
+
+  const namaPenerima = document.getElementById('akr_terima_nama').value.trim();
+  const catatan = document.getElementById('akr_terima_catatan').value.trim();
+  const fileInput = document.getElementById('akr_terima_foto');
+  const item = acrylicData[acrylicTerimaIndex];
+
+  if (!item) {
+    return setDebug('Data pengiriman tidak ditemukan.', true);
+  }
+
+  if (!namaPenerima) {
+    return setDebug('Nama penerima wajib diisi.', true);
+  }
+
+  const simpanFinal = (fotoBase64 = item.foto_bukti || '') => {
+    item.nama_penerima = namaPenerima;
+    item.catatan_penerimaan = catatan;
+    item.foto_bukti = fotoBase64;
+    item.tanggal_terima = new Date().toLocaleString('id-ID');
+    item.status = 'Diterima';
+
+    renderAcrylic();
+    resetPenerimaanAcrylic();
+    setDebug('Penerimaan acrylic berhasil disimpan.');
+  };
+
+  if (fileInput.files && fileInput.files[0]) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      simpanFinal(e.target.result);
+    };
+    reader.readAsDataURL(fileInput.files[0]);
+  } else {
+    simpanFinal();
+  }
+}
+
+function lihatFotoAcrylic(index) {
+  const item = acrylicData[index];
+  if (!item || !item.foto_bukti) {
+    return setDebug('Foto bukti belum ada.', true);
+  }
+
+  const win = window.open('', '_blank');
+  win.document.write(`
+    <html>
+      <head>
+        <title>Foto Bukti Acrylic</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; text-align: center; background: #f8fafc; }
+          img { max-width: 100%; height: auto; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.15); }
+        </style>
+      </head>
+      <body>
+        <h2>Foto Bukti Penerimaan</h2>
+        <p><b>No Kirim:</b> ${item.no}</p>
+        <img src="${item.foto_bukti}" alt="Foto Bukti">
+      </body>
+    </html>
+  `);
+  win.document.close();
 }
 
 function renderAcrylic() {
@@ -1764,23 +1891,47 @@ function renderAcrylic() {
         <th>Tujuan</th>
         <th>Supir</th>
         <th>Status</th>
+        <th>Penerima</th>
+        <th>Tgl Terima</th>
+        <th>Aksi</th>
       </tr>
   `;
 
-  acrylicData.forEach(x => {
+  if (!acrylicData.length) {
     html += `
       <tr>
-        <td>${x.no}</td>
-        <td>${x.tanggal}</td>
-        <td>${x.produk}</td>
-        <td>${x.ukuran}</td>
-        <td>${x.qty}</td>
-        <td>${x.tujuan}</td>
-        <td>${x.supir}</td>
-        <td>${x.status}</td>
+        <td colspan="11" style="text-align:center;">Belum ada data pengiriman acrylic</td>
       </tr>
     `;
-  });
+  } else {
+    acrylicData.forEach((x, index) => {
+      html += `
+        <tr>
+          <td>${x.no || ''}</td>
+          <td>${x.tanggal || ''}</td>
+          <td>${x.produk || ''}</td>
+          <td>${x.ukuran || ''}</td>
+          <td>${x.qty || 0}</td>
+          <td>${x.tujuan || ''}</td>
+          <td>${x.supir || ''}</td>
+          <td class="${x.status === 'Diterima' ? 'status-ok' : 'status-warn'}">${x.status || ''}</td>
+          <td>${x.nama_penerima || '-'}</td>
+          <td>${x.tanggal_terima || '-'}</td>
+          <td>
+            ${
+              x.status === 'Diterima'
+                ? `
+                  <button class="btn secondary" onclick="lihatFotoAcrylic(${index})">Lihat Foto</button>
+                `
+                : `
+                  <button class="btn" onclick="pilihTerimaAcrylic(${index})">Terima</button>
+                `
+            }
+          </td>
+        </tr>
+      `;
+    });
+  }
 
   html += '</table>';
   document.getElementById('acrylicWrap').innerHTML = html;
@@ -1791,6 +1942,7 @@ cekSession = async function() {
   await oldCekSession();
   if (document.getElementById('akr_no')) {
     resetAcrylic();
+    resetPenerimaanAcrylic();
     renderAcrylic();
   }
 };
