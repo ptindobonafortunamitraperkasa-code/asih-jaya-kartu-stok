@@ -183,16 +183,15 @@
         <div id="debug" class="result muted"></div>
       </div>
 <div class="menu">
-  <button id="tab-btn-dashboard" class="active" onclick="showTab('dashboard')">Dashboard</button>
-  <button id="tab-btn-barang" onclick="showTab('barang')">Data Barang</button>
-  <button id="tab-btn-masuk" onclick="showTab('masuk')">Barang Masuk</button>
-  <button id="tab-btn-keluar" onclick="showTab('keluar')">Barang Keluar</button>
-  <button id="tab-btn-retur" onclick="showTab('retur')">Retur Barang</button>
-  <button id="tab-btn-kartu" onclick="showTab('kartu')">Kartu Stok</button>
-  <button id="tab-btn-opname" onclick="showTab('opname')">Opname</button>
-  <button id="tab-btn-laporan" onclick="showTab('laporan')">Laporan</button>
-  <button id="tab-btn-acrylic" onclick="showTab('acrylic')">Acrylic</button>
-</div>
+        <button id="tab-btn-dashboard" class="active" onclick="showTab('dashboard')">Dashboard</button>
+        <button id="tab-btn-barang" onclick="showTab('barang')">Data Barang</button>
+        <button id="tab-btn-masuk" onclick="showTab('masuk')">Barang Masuk</button>
+        <button id="tab-btn-keluar" onclick="showTab('keluar')">Barang Keluar</button>
+        <button id="tab-btn-kartu" onclick="showTab('kartu')">Kartu Stok</button>
+        <button id="tab-btn-opname" onclick="showTab('opname')">Opname</button>
+        <button id="tab-btn-laporan" onclick="showTab('laporan')">Laporan</button>
+        <button id="tab-btn-acrylic" onclick="showTab('acrylic')">Acrylic</button>
+      </div>
 
     <div id="tab-dashboard" class="tab-content">
   <div class="card">
@@ -368,93 +367,6 @@
           </div>
         </div>
       </div>
-      <div id="tab-retur" class="tab-content hidden">
-  <div class="card">
-    <h2>Retur Barang</h2>
-    <div class="grid-3">
-      <div class="field">
-        <label>No Retur</label>
-        <input id="retur_no" readonly>
-      </div>
-      <div class="field">
-        <label>Tanggal</label>
-        <input id="retur_tanggal" type="date">
-      </div>
-      <div class="field">
-        <label>Jenis Retur</label>
-        <select id="retur_jenis">
-          <option value="retur_masuk">Retur Masuk</option>
-          <option value="retur_keluar">Retur Keluar</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label>Cari Barang</label>
-        <input id="search_retur" placeholder="ketik nama barang..." oninput="isiDropdownReturBarang()">
-      </div>
-      <div class="field">
-        <label>Pilih Barang</label>
-        <select id="retur_product"></select>
-      </div>
-      <div class="field">
-        <label>Qty</label>
-        <input id="retur_qty" type="number">
-      </div>
-
-      <div class="field">
-        <label>Kondisi Barang</label>
-        <select id="retur_kondisi">
-          <option value="baik">Baik</option>
-          <option value="lecet">Lecet</option>
-          <option value="rusak_ringan">Rusak Ringan</option>
-          <option value="rusak_berat">Rusak Berat</option>
-          <option value="pecah">Pecah</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Asal Retur</label>
-        <select id="retur_asal">
-          <option value="customer">Customer</option>
-          <option value="supplier">Supplier</option>
-          <option value="internal">Internal</option>
-          <option value="lainnya">Lainnya</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Supplier / Customer</label>
-        <input id="retur_partner" placeholder="Nama supplier / customer">
-      </div>
-
-      <div class="field">
-        <label>Gudang</label>
-        <input id="retur_gudang">
-      </div>
-      <div class="field">
-        <label>Lokasi / Rak</label>
-        <input id="retur_lokasi">
-      </div>
-      <div class="field">
-        <label>Alasan Retur</label>
-        <input id="retur_alasan" placeholder="contoh: rusak, lecet, salah kirim">
-      </div>
-
-      <div class="field" style="grid-column: span 3;">
-        <label>Keterangan</label>
-        <input id="retur_keterangan" placeholder="Catatan tambahan">
-      </div>
-    </div>
-
-    <div class="actions">
-      <button class="btn" onclick="simpanReturBarang()">Simpan Retur</button>
-      <button class="btn secondary" onclick="resetFormRetur()">Reset</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Riwayat Retur Barang</h2>
-    <div id="returWrap"></div>
-  </div>
-</div>
 
       <div id="tab-kartu" class="tab-content hidden">
         <div class="card">
@@ -743,17 +655,13 @@ async function loadSemua() {
   renderKartuStok();
   renderRiwayatOpname();
   renderDashboard();
-  renderReturTable();
-
   resetFormBarang();
   resetAcrylic();
   resetPenerimaanAcrylic();
-  resetFormRetur();
-
   isiDropdownAcrylicProduk();
+
   isiDropdownBarangMasuk();
   isiDropdownBarangKeluar();
-  isiDropdownReturBarang();
 
   setDebug('Semua data berhasil di-refresh.');
 }
@@ -817,209 +725,19 @@ async function loadProducts() {
   }));
 }
 
-function generateNoRetur() {
-  const returRows = transactionsData.filter(trx => (trx.kategori_stok || '') === 'retur');
-  const nextNum = returRows.length + 1;
-  return 'RTR' + String(nextNum).padStart(4, '0');
-}
-
-function resetFormRetur() {
-  const today = new Date().toISOString().slice(0, 10);
-
-  document.getElementById('retur_no').value = generateNoRetur();
-  document.getElementById('retur_tanggal').value = today;
-  document.getElementById('retur_jenis').value = 'retur_masuk';
-  document.getElementById('search_retur').value = '';
-  document.getElementById('retur_qty').value = '';
-  document.getElementById('retur_kondisi').value = 'baik';
-  document.getElementById('retur_asal').value = 'customer';
-  document.getElementById('retur_partner').value = '';
-  document.getElementById('retur_gudang').value = '';
-  document.getElementById('retur_lokasi').value = '';
-  document.getElementById('retur_alasan').value = '';
-  document.getElementById('retur_keterangan').value = '';
-
-  isiDropdownReturBarang();
-}
-
-function isiDropdownReturBarang() {
-  const q = (document.getElementById('search_retur').value || '').toLowerCase();
-  const select = document.getElementById('retur_product');
-  if (!select) return;
-
-  select.innerHTML = '';
-
-  productsData
-    .filter(item =>
-      !q ||
-      (item.nama_barang || '').toLowerCase().includes(q) ||
-      (item.kode_barang || '').toLowerCase().includes(q)
-    )
-    .forEach(item => {
-      const opt = document.createElement('option');
-      opt.value = item.id;
-      opt.textContent = `${item.nama_barang} | ${item.gudang || '-'} | ${item.lokasi || '-'} | Retur: ${hitungStokRetur(item.id)}`;
-      select.appendChild(opt);
-    });
-}
-
-async function simpanReturBarang() {
-  const noRetur = document.getElementById('retur_no').value.trim();
-  const tanggal = document.getElementById('retur_tanggal').value;
-  const productId = document.getElementById('retur_product').value;
-  const jenisRetur = document.getElementById('retur_jenis').value;
-  const qty = Number(document.getElementById('retur_qty').value || 0);
-  const kondisiBarang = document.getElementById('retur_kondisi').value;
-  const asalRetur = document.getElementById('retur_asal').value;
-  const partner = document.getElementById('retur_partner').value.trim();
-  const gudangInput = document.getElementById('retur_gudang').value.trim();
-  const lokasiInput = document.getElementById('retur_lokasi').value.trim();
-  const alasanRetur = document.getElementById('retur_alasan').value.trim();
-  const keteranganInput = document.getElementById('retur_keterangan').value.trim();
-
-  const barang = productsData.find(x => x.id === productId);
-
-  if (!barang) return setDebug('Barang retur belum dipilih.', true);
-  if (!noRetur) return setDebug('No retur kosong.', true);
-  if (!tanggal) return setDebug('Tanggal retur wajib diisi.', true);
-  if (qty <= 0) return setDebug('Qty retur harus lebih dari 0.', true);
-
-  const gudang = gudangInput || barang.gudang || '';
-  const lokasi = lokasiInput || barang.lokasi || '';
-
-  // retur masuk = masuk ke stok retur, bukan stok utama
-  const payload = {
-  trx_no: noRetur,
-  trx_date: tanggal,
-  trx_type: 'masuk',
-  product_id: productId,
-  kategori_stok: 'retur',
-  jumlah: qty,
-  gudang,
-  lokasi,
-  jenis_retur: jenisRetur,
-  kondisi_barang: kondisiBarang,
-  partner: partner,
-  keterangan: `RETUR_MASUK | ${noRetur} | asal:${asalRetur} | alasan:${alasanRetur || '-'} | ${keteranganInput || '-'}`,
-  created_by: currentUser?.id || null
-};
-
-    const { error } = await client.from('stock_transactions').insert([payload]);
-    if (error) return setDebug('Gagal simpan retur masuk: ' + error.message, true);
-  }
-
-  // retur keluar = keluar dari stok retur, bukan dari stok utama
-  if (jenisRetur === 'retur_keluar') {
-    const stokReturSaatIni = hitungStokRetur(productId);
-    if (qty > stokReturSaatIni) {
-      return setDebug('Qty retur keluar melebihi stok retur saat ini: ' + stokReturSaatIni, true);
+    function hitungStokBarang(productId) {
+      const barang = productsData.find(x => x.id === productId);
+      const stokAwal = Number(barang?.stok_awal || 0);
+      let masuk = 0;
+      let keluar = 0;
+      transactionsData.forEach(trx => {
+        if (trx.product_id === productId) {
+          if (trx.jenis_transaksi === 'masuk') masuk += Number(trx.jumlah || 0);
+          if (trx.jenis_transaksi === 'keluar') keluar += Number(trx.jumlah || 0);
+        }
+      });
+      return stokAwal + masuk - keluar;
     }
-
-const payload = {
-  trx_no: noRetur,
-  trx_date: tanggal,
-  trx_type: 'masuk',
-  product_id: productId,
-  kategori_stok: 'retur',
-  jumlah: qty,
-  gudang,
-  lokasi,
-  jenis_retur: jenisRetur,
-  kondisi_barang: kondisiBarang,
-  partner: partner,
-  keterangan: `RETUR_MASUK | ${noRetur} | asal:${asalRetur} | alasan:${alasanRetur || '-'} | ${keteranganInput || '-'}`,
-  created_by: currentUser?.id || null
-};
-    const { error } = await client.from('stock_transactions').insert([payload]);
-    if (error) return setDebug('Gagal simpan retur keluar: ' + error.message, true);
-  }
-
-  setDebug('Data retur berhasil disimpan.');
-  await loadTransactions();
-  renderReturTable();
-  renderProductsTable();
-  renderDashboard();
-  resetFormRetur();
-}
-
-function renderReturTable() {
-  const wrap = document.getElementById('returWrap');
-  if (!wrap) return;
-
-  const returRows = transactionsData.filter(trx => (trx.kategori_stok || '') === 'retur');
-
-  let html = `
-    <table>
-      <tr>
-        <th>No Retur</th>
-        <th>Tanggal</th>
-        <th>Jenis</th>
-        <th>Barang</th>
-        <th>Qty</th>
-        <th>Kondisi</th>
-        <th>Partner</th>
-        <th>Gudang</th>
-        <th>Lokasi</th>
-        <th>Keterangan</th>
-      </tr>
-  `;
-
-  returRows.forEach(trx => {
-    const barang = productsData.find(x => x.id === trx.product_id);
-
-    let noRetur = '-';
-    const ket = trx.keterangan || '';
-    const parts = ket.split('|').map(x => x.trim());
-    if (parts.length > 1) noRetur = parts[1];
-
-    html += `
-      <tr>
-        <td>${noRetur}</td>
-        <td>${trx.tanggal || ''}</td>
-        <td>${trx.jenis_retur || ''}</td>
-        <td>${barang?.nama_barang || '-'}</td>
-        <td>${trx.jumlah || 0}</td>
-        <td>${trx.kondisi_barang || ''}</td>
-        <td>${trx.partner || ''}</td>
-        <td>${trx.gudang || ''}</td>
-        <td>${trx.lokasi || ''}</td>
-        <td>${trx.keterangan || ''}</td>
-      </tr>
-    `;
-  });
-
-  html += '</table>';
-  wrap.innerHTML = html;
-}
-   function hitungStokBarang(productId) {
-  const barang = productsData.find(x => x.id === productId);
-  const stokAwal = Number(barang?.stok_awal || 0);
-
-  let masuk = 0;
-  let keluar = 0;
-
-  transactionsData.forEach(trx => {
-    if (trx.product_id === productId && (trx.kategori_stok || 'utama') === 'utama') {
-      if (trx.jenis_transaksi === 'masuk') masuk += Number(trx.jumlah || 0);
-      if (trx.jenis_transaksi === 'keluar') keluar += Number(trx.jumlah || 0);
-    }
-  });
-
-  return stokAwal + masuk - keluar;
-}
-    function hitungStokRetur(productId) {
-  let masuk = 0;
-  let keluar = 0;
-
-  transactionsData.forEach(trx => {
-    if (trx.product_id === productId && (trx.kategori_stok || '') === 'retur') {
-      if (trx.jenis_transaksi === 'masuk') masuk += Number(trx.jumlah || 0);
-      if (trx.jenis_transaksi === 'keluar') keluar += Number(trx.jumlah || 0);
-    }
-  });
-
-  return masuk - keluar;
-}
 
     function statusStok(item) {
       const stok = hitungStokBarang(item.id);
@@ -1311,21 +1029,20 @@ function renderReturTable() {
   async function simpanBarangMasuk() {
   const supplier = document.getElementById('masuk_supplier').value.trim();
 
-const payload = {
-  trx_no: noRetur,
-  trx_date: tanggal,
-  trx_type: 'masuk',
-  product_id: productId,
-  kategori_stok: 'retur',
-  jumlah: qty,
-  gudang,
-  lokasi,
-  jenis_retur: jenisRetur,
-  kondisi_barang: kondisiBarang,
-  partner: partner,
-  keterangan: 'RETUR MASUK',
-  created_by: currentUser?.id || null
-};
+  const payload = {
+    product_id: document.getElementById('masuk_product').value,
+    jenis_transaksi: 'masuk',
+    jumlah: Number(document.getElementById('masuk_jumlah').value || 0),
+    gudang: document.getElementById('masuk_gudang').value,
+    lokasi: document.getElementById('masuk_lokasi').value,
+    keterangan:
+      'Supplier: ' + supplier +
+      (document.getElementById('masuk_keterangan').value
+        ? ' | ' + document.getElementById('masuk_keterangan').value
+        : ''),
+    created_by: currentUser?.id || null
+  };
+
   const barang = productsData.find(x => x.id === payload.product_id);
   if (!barang) return setDebug('Barang belum dipilih.', true);
   if (!supplier) return setDebug('Supplier wajib diisi.', true);
