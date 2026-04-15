@@ -183,15 +183,16 @@
         <div id="debug" class="result muted"></div>
       </div>
 <div class="menu">
-        <button id="tab-btn-dashboard" class="active" onclick="showTab('dashboard')">Dashboard</button>
-        <button id="tab-btn-barang" onclick="showTab('barang')">Data Barang</button>
-        <button id="tab-btn-masuk" onclick="showTab('masuk')">Barang Masuk</button>
-        <button id="tab-btn-keluar" onclick="showTab('keluar')">Barang Keluar</button>
-        <button id="tab-btn-kartu" onclick="showTab('kartu')">Kartu Stok</button>
-        <button id="tab-btn-opname" onclick="showTab('opname')">Opname</button>
-        <button id="tab-btn-laporan" onclick="showTab('laporan')">Laporan</button>
-        <button id="tab-btn-acrylic" onclick="showTab('acrylic')">Acrylic</button>
-      </div>
+  <button id="tab-btn-dashboard" class="active" onclick="showTab('dashboard')">Dashboard</button>
+  <button id="tab-btn-barang" onclick="showTab('barang')">Data Barang</button>
+  <button id="tab-btn-masuk" onclick="showTab('masuk')">Barang Masuk</button>
+  <button id="tab-btn-keluar" onclick="showTab('keluar')">Barang Keluar</button>
+  <button id="tab-btn-retur" onclick="showTab('retur')">Retur Barang</button>
+  <button id="tab-btn-kartu" onclick="showTab('kartu')">Kartu Stok</button>
+  <button id="tab-btn-opname" onclick="showTab('opname')">Opname</button>
+  <button id="tab-btn-laporan" onclick="showTab('laporan')">Laporan</button>
+  <button id="tab-btn-acrylic" onclick="showTab('acrylic')">Acrylic</button>
+</div>
 
     <div id="tab-dashboard" class="tab-content">
   <div class="card">
@@ -367,6 +368,93 @@
           </div>
         </div>
       </div>
+      <div id="tab-retur" class="tab-content hidden">
+  <div class="card">
+    <h2>Retur Barang</h2>
+    <div class="grid-3">
+      <div class="field">
+        <label>No Retur</label>
+        <input id="retur_no" readonly>
+      </div>
+      <div class="field">
+        <label>Tanggal</label>
+        <input id="retur_tanggal" type="date">
+      </div>
+      <div class="field">
+        <label>Jenis Retur</label>
+        <select id="retur_jenis">
+          <option value="retur_masuk">Retur Masuk</option>
+          <option value="retur_keluar">Retur Keluar</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Cari Barang</label>
+        <input id="search_retur" placeholder="ketik nama barang..." oninput="isiDropdownReturBarang()">
+      </div>
+      <div class="field">
+        <label>Pilih Barang</label>
+        <select id="retur_product"></select>
+      </div>
+      <div class="field">
+        <label>Qty</label>
+        <input id="retur_qty" type="number">
+      </div>
+
+      <div class="field">
+        <label>Kondisi Barang</label>
+        <select id="retur_kondisi">
+          <option value="baik">Baik</option>
+          <option value="lecet">Lecet</option>
+          <option value="rusak_ringan">Rusak Ringan</option>
+          <option value="rusak_berat">Rusak Berat</option>
+          <option value="pecah">Pecah</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Asal Retur</label>
+        <select id="retur_asal">
+          <option value="customer">Customer</option>
+          <option value="supplier">Supplier</option>
+          <option value="internal">Internal</option>
+          <option value="lainnya">Lainnya</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Supplier / Customer</label>
+        <input id="retur_partner" placeholder="Nama supplier / customer">
+      </div>
+
+      <div class="field">
+        <label>Gudang</label>
+        <input id="retur_gudang">
+      </div>
+      <div class="field">
+        <label>Lokasi / Rak</label>
+        <input id="retur_lokasi">
+      </div>
+      <div class="field">
+        <label>Alasan Retur</label>
+        <input id="retur_alasan" placeholder="contoh: rusak, lecet, salah kirim">
+      </div>
+
+      <div class="field" style="grid-column: span 3;">
+        <label>Keterangan</label>
+        <input id="retur_keterangan" placeholder="Catatan tambahan">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" onclick="simpanReturBarang()">Simpan Retur</button>
+      <button class="btn secondary" onclick="resetFormRetur()">Reset</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Riwayat Retur Barang</h2>
+    <div id="returWrap"></div>
+  </div>
+</div>
 
       <div id="tab-kartu" class="tab-content hidden">
         <div class="card">
@@ -556,6 +644,7 @@
     let currentUser = null;
     let currentProfile = null;
     let editingId = null;
+    let returnsData = [];
 
     function setDebug(text, isError = false) {
       const el = document.getElementById('debug');
@@ -650,18 +739,23 @@ async function loadSemua() {
   await loadTransactions();
   await loadOpnames();
   await loadAcrylic();
+  await loadReturns();
 
   renderProductsTable();
   renderKartuStok();
   renderRiwayatOpname();
   renderDashboard();
+  renderReturTable();
+
   resetFormBarang();
   resetAcrylic();
   resetPenerimaanAcrylic();
-  isiDropdownAcrylicProduk();
+  resetFormRetur();
 
+  isiDropdownAcrylicProduk();
   isiDropdownBarangMasuk();
   isiDropdownBarangKeluar();
+  isiDropdownReturBarang();
 
   setDebug('Semua data berhasil di-refresh.');
 }
@@ -723,6 +817,205 @@ async function loadProducts() {
     ...item,
     product_id: item.product_id != null ? String(item.product_id) : ''
   }));
+}
+    async function loadReturns() {
+  const { data, error } = await client
+    .from('stock_returns')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    setDebug('Gagal load retur: ' + error.message, true);
+    return;
+  }
+
+  returnsData = (data || []).map(item => ({
+    ...item,
+    id: String(item.id),
+    product_id: item.product_id != null ? String(item.product_id) : ''
+  }));
+}
+
+function generateNoRetur() {
+  const nextNum = returnsData.length + 1;
+  return 'RTR' + String(nextNum).padStart(4, '0');
+}
+
+function resetFormRetur() {
+  const today = new Date().toISOString().slice(0, 10);
+  const noEl = document.getElementById('retur_no');
+  const tglEl = document.getElementById('retur_tanggal');
+  const jenisEl = document.getElementById('retur_jenis');
+  const searchEl = document.getElementById('search_retur');
+  const productEl = document.getElementById('retur_product');
+  const qtyEl = document.getElementById('retur_qty');
+  const kondisiEl = document.getElementById('retur_kondisi');
+  const asalEl = document.getElementById('retur_asal');
+  const partnerEl = document.getElementById('retur_partner');
+  const gudangEl = document.getElementById('retur_gudang');
+  const lokasiEl = document.getElementById('retur_lokasi');
+  const alasanEl = document.getElementById('retur_alasan');
+  const ketEl = document.getElementById('retur_keterangan');
+
+  if (noEl) noEl.value = generateNoRetur();
+  if (tglEl) tglEl.value = today;
+  if (jenisEl) jenisEl.value = 'retur_masuk';
+  if (searchEl) searchEl.value = '';
+  if (productEl) productEl.innerHTML = '';
+  if (qtyEl) qtyEl.value = '';
+  if (kondisiEl) kondisiEl.value = 'baik';
+  if (asalEl) asalEl.value = 'customer';
+  if (partnerEl) partnerEl.value = '';
+  if (gudangEl) gudangEl.value = '';
+  if (lokasiEl) lokasiEl.value = '';
+  if (alasanEl) alasanEl.value = '';
+  if (ketEl) ketEl.value = '';
+
+  isiDropdownReturBarang();
+}
+
+function isiDropdownReturBarang() {
+  const searchEl = document.getElementById('search_retur');
+  const select = document.getElementById('retur_product');
+  if (!select) return;
+
+  const q = (searchEl?.value || '').toLowerCase();
+  select.innerHTML = '';
+
+  productsData
+    .filter(item =>
+      !q ||
+      (item.nama_barang || '').toLowerCase().includes(q) ||
+      (item.kode_barang || '').toLowerCase().includes(q)
+    )
+    .forEach(item => {
+      const opt = document.createElement('option');
+      opt.value = item.id;
+      opt.textContent = `${item.nama_barang} | ${item.gudang || '-'} | ${item.lokasi || '-'} | ${item.letak_barang || '-'}`;
+      select.appendChild(opt);
+    });
+}
+
+async function simpanReturBarang() {
+  const payload = {
+    no_retur: document.getElementById('retur_no').value.trim(),
+    tanggal: document.getElementById('retur_tanggal').value,
+    product_id: document.getElementById('retur_product').value,
+    jenis_retur: document.getElementById('retur_jenis').value,
+    qty: Number(document.getElementById('retur_qty').value || 0),
+    kondisi_barang: document.getElementById('retur_kondisi').value,
+    asal_retur: document.getElementById('retur_asal').value,
+    partner: document.getElementById('retur_partner').value.trim(),
+    gudang: document.getElementById('retur_gudang').value.trim(),
+    lokasi: document.getElementById('retur_lokasi').value.trim(),
+    alasan_retur: document.getElementById('retur_alasan').value.trim(),
+    keterangan: document.getElementById('retur_keterangan').value.trim(),
+    created_by: currentUser?.id || null
+  };
+
+  const barang = productsData.find(x => x.id === payload.product_id);
+
+  if (!barang) return setDebug('Barang retur belum dipilih.', true);
+  if (!payload.no_retur) return setDebug('No retur kosong.', true);
+  if (!payload.tanggal) return setDebug('Tanggal retur wajib diisi.', true);
+  if (payload.qty <= 0) return setDebug('Qty retur harus lebih dari 0.', true);
+
+  if (!payload.gudang) payload.gudang = barang.gudang || '';
+  if (!payload.lokasi) payload.lokasi = barang.lokasi || '';
+
+  if (payload.jenis_retur === 'retur_keluar') {
+    const stokSaatIni = hitungStokBarang(payload.product_id);
+    if (payload.qty > stokSaatIni) {
+      return setDebug('Qty retur keluar melebihi stok saat ini: ' + stokSaatIni, true);
+    }
+  }
+
+  const { error: returError } = await client.from('stock_returns').insert([payload]);
+  if (returError) return setDebug('Gagal simpan retur: ' + returError.message, true);
+
+  if (payload.jenis_retur === 'retur_masuk' && payload.kondisi_barang === 'baik') {
+    const trxMasuk = {
+      product_id: payload.product_id,
+      jenis_transaksi: 'masuk',
+      jumlah: payload.qty,
+      gudang: payload.gudang,
+      lokasi: payload.lokasi,
+      keterangan: `Retur Masuk | ${payload.no_retur} | ${payload.partner || '-'} | ${payload.alasan_retur || '-'}`,
+      created_by: currentUser?.id || null
+    };
+
+    const { error: trxError } = await client.from('stock_transactions').insert([trxMasuk]);
+    if (trxError) return setDebug('Retur tersimpan, tapi stok masuk gagal: ' + trxError.message, true);
+  }
+
+  if (payload.jenis_retur === 'retur_keluar') {
+    const trxKeluar = {
+      product_id: payload.product_id,
+      jenis_transaksi: 'keluar',
+      jumlah: payload.qty,
+      gudang: payload.gudang,
+      lokasi: payload.lokasi,
+      keterangan: `Retur Keluar | ${payload.no_retur} | ${payload.partner || '-'} | ${payload.alasan_retur || '-'}`,
+      created_by: currentUser?.id || null
+    };
+
+    const { error: trxError } = await client.from('stock_transactions').insert([trxKeluar]);
+    if (trxError) return setDebug('Retur tersimpan, tapi stok keluar gagal: ' + trxError.message, true);
+  }
+
+  setDebug('Data retur berhasil disimpan.');
+  await loadReturns();
+  await loadTransactions();
+  renderReturTable();
+  renderProductsTable();
+  renderDashboard();
+  resetFormRetur();
+}
+
+function renderReturTable() {
+  const wrap = document.getElementById('returWrap');
+  if (!wrap) return;
+
+  let html = `
+    <table>
+      <tr>
+        <th>No Retur</th>
+        <th>Tanggal</th>
+        <th>Jenis</th>
+        <th>Barang</th>
+        <th>Qty</th>
+        <th>Kondisi</th>
+        <th>Asal</th>
+        <th>Supplier / Customer</th>
+        <th>Gudang</th>
+        <th>Lokasi</th>
+        <th>Alasan</th>
+        <th>Keterangan</th>
+      </tr>
+  `;
+
+  returnsData.forEach(item => {
+    const barang = productsData.find(x => x.id === item.product_id);
+    html += `
+      <tr>
+        <td>${item.no_retur || ''}</td>
+        <td>${item.tanggal || ''}</td>
+        <td>${item.jenis_retur || ''}</td>
+        <td>${barang?.nama_barang || '-'}</td>
+        <td>${item.qty || 0}</td>
+        <td>${item.kondisi_barang || ''}</td>
+        <td>${item.asal_retur || ''}</td>
+        <td>${item.partner || ''}</td>
+        <td>${item.gudang || ''}</td>
+        <td>${item.lokasi || ''}</td>
+        <td>${item.alasan_retur || ''}</td>
+        <td>${item.keterangan || ''}</td>
+      </tr>
+    `;
+  });
+
+  html += '</table>';
+  wrap.innerHTML = html;
 }
 
     function hitungStokBarang(productId) {
