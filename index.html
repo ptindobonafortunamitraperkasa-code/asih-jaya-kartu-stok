@@ -1045,7 +1045,10 @@ async function loadProducts() {
   if (!payload.gudang) payload.gudang = barang.gudang || '';
   if (!payload.lokasi) payload.lokasi = barang.lokasi || '';
 
-  const { error } = await client.from('stock_transactions').insert([payload]);
+const { error } = await client
+  .from('stock_transactions')
+  .insert([payload])
+  .select();
   if (error) return setDebug('Gagal simpan barang masuk: ' + error.message, true);
 
   setDebug('Barang masuk berhasil disimpan.');
