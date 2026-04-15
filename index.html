@@ -457,10 +457,20 @@
         <input id="akr_no" readonly>
       </div>
 
-      <div class="field">
-        <label>Produk</label>
-        <input id="akr_produk" placeholder="Nama acrylic">
-      </div>
+    <div class="field">
+  <label>Cari Produk</label>
+  <input id="search_akr_produk" placeholder="ketik nama barang..." oninput="isiDropdownAcrylicProduk()">
+</div>
+
+<div class="field">
+  <label>Pilih Produk</label>
+  <select id="akr_produk_select" onchange="pilihProdukAcrylic()"></select>
+</div>
+
+<div class="field">
+  <label>Produk</label>
+  <input id="akr_produk" placeholder="Nama acrylic" readonly>
+</div>
 
       <div class="field">
         <label>Ukuran</label>
@@ -646,6 +656,7 @@ async function loadSemua() {
   resetFormBarang();
   resetAcrylic();
   resetPenerimaanAcrylic();
+  isiDropdownAcrylicProduk();
 
   isiDropdownBarangMasuk();
   isiDropdownBarangKeluar();
@@ -1773,6 +1784,8 @@ function generateNoAcrylic() {
 
 function resetAcrylic() {
   document.getElementById('akr_no').value = generateNoAcrylic();
+  document.getElementById('search_akr_produk').value = '';
+  document.getElementById('akr_produk_select').innerHTML = '<option value="">-- pilih produk --</option>';
   document.getElementById('akr_produk').value = '';
   document.getElementById('akr_ukuran').value = '';
   document.getElementById('akr_qty').value = '';
@@ -1787,6 +1800,33 @@ function resetPenerimaanAcrylic() {
   document.getElementById('akr_terima_nama').value = '';
   document.getElementById('akr_terima_foto').value = '';
   document.getElementById('akr_terima_catatan').value = '';
+}
+    function isiDropdownAcrylicProduk() {
+  const q = (document.getElementById('search_akr_produk').value || '').toLowerCase();
+  const select = document.getElementById('akr_produk_select');
+  if (!select) return;
+
+  select.innerHTML = '<option value="">-- pilih produk --</option>';
+
+  productsData
+    .filter(item => {
+      const nama = (item.nama_barang || '').toLowerCase();
+      const kode = (item.kode_barang || '').toLowerCase();
+      return !q || nama.includes(q) || kode.includes(q);
+    })
+    .forEach(item => {
+      const opt = document.createElement('option');
+      opt.value = item.id;
+      opt.textContent = `${item.nama_barang} | ${item.kode_barang || '-'}`;
+      select.appendChild(opt);
+    });
+}
+
+function pilihProdukAcrylic() {
+  const productId = document.getElementById('akr_produk_select').value;
+  const item = productsData.find(x => x.id === productId);
+
+  document.getElementById('akr_produk').value = item ? (item.nama_barang || '') : '';
 }
 
 async function simpanAcrylic() {
