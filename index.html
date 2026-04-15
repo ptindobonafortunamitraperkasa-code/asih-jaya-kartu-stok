@@ -644,7 +644,6 @@
     let currentUser = null;
     let currentProfile = null;
     let editingId = null;
-    let returnsData = [];
 
     function setDebug(text, isError = false) {
       const el = document.getElementById('debug');
@@ -739,7 +738,6 @@ async function loadSemua() {
   await loadTransactions();
   await loadOpnames();
   await loadAcrylic();
-  await loadReturns();
 
   renderProductsTable();
   renderKartuStok();
@@ -818,68 +816,37 @@ async function loadProducts() {
     product_id: item.product_id != null ? String(item.product_id) : ''
   }));
 }
-    async function loadReturns() {
-  const { data, error } = await client
-    .from('stock_returns')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    setDebug('Gagal load retur: ' + error.message, true);
-    return;
-  }
-
-  returnsData = (data || []).map(item => ({
-    ...item,
-    id: String(item.id),
-    product_id: item.product_id != null ? String(item.product_id) : ''
-  }));
-}
 
 function generateNoRetur() {
-  const nextNum = returnsData.length + 1;
+  const returRows = transactionsData.filter(trx => (trx.kategori_stok || '') === 'retur');
+  const nextNum = returRows.length + 1;
   return 'RTR' + String(nextNum).padStart(4, '0');
 }
 
 function resetFormRetur() {
   const today = new Date().toISOString().slice(0, 10);
-  const noEl = document.getElementById('retur_no');
-  const tglEl = document.getElementById('retur_tanggal');
-  const jenisEl = document.getElementById('retur_jenis');
-  const searchEl = document.getElementById('search_retur');
-  const productEl = document.getElementById('retur_product');
-  const qtyEl = document.getElementById('retur_qty');
-  const kondisiEl = document.getElementById('retur_kondisi');
-  const asalEl = document.getElementById('retur_asal');
-  const partnerEl = document.getElementById('retur_partner');
-  const gudangEl = document.getElementById('retur_gudang');
-  const lokasiEl = document.getElementById('retur_lokasi');
-  const alasanEl = document.getElementById('retur_alasan');
-  const ketEl = document.getElementById('retur_keterangan');
 
-  if (noEl) noEl.value = generateNoRetur();
-  if (tglEl) tglEl.value = today;
-  if (jenisEl) jenisEl.value = 'retur_masuk';
-  if (searchEl) searchEl.value = '';
-  if (productEl) productEl.innerHTML = '';
-  if (qtyEl) qtyEl.value = '';
-  if (kondisiEl) kondisiEl.value = 'baik';
-  if (asalEl) asalEl.value = 'customer';
-  if (partnerEl) partnerEl.value = '';
-  if (gudangEl) gudangEl.value = '';
-  if (lokasiEl) lokasiEl.value = '';
-  if (alasanEl) alasanEl.value = '';
-  if (ketEl) ketEl.value = '';
+  document.getElementById('retur_no').value = generateNoRetur();
+  document.getElementById('retur_tanggal').value = today;
+  document.getElementById('retur_jenis').value = 'retur_masuk';
+  document.getElementById('search_retur').value = '';
+  document.getElementById('retur_qty').value = '';
+  document.getElementById('retur_kondisi').value = 'baik';
+  document.getElementById('retur_asal').value = 'customer';
+  document.getElementById('retur_partner').value = '';
+  document.getElementById('retur_gudang').value = '';
+  document.getElementById('retur_lokasi').value = '';
+  document.getElementById('retur_alasan').value = '';
+  document.getElementById('retur_keterangan').value = '';
 
   isiDropdownReturBarang();
 }
 
 function isiDropdownReturBarang() {
-  const searchEl = document.getElementById('search_retur');
+  const q = (document.getElementById('search_retur').value || '').toLowerCase();
   const select = document.getElementById('retur_product');
   if (!select) return;
 
-  const q = (searchEl?.value || '').toLowerCase();
   select.innerHTML = '';
 
   productsData
@@ -891,80 +858,80 @@ function isiDropdownReturBarang() {
     .forEach(item => {
       const opt = document.createElement('option');
       opt.value = item.id;
-      opt.textContent = `${item.nama_barang} | ${item.gudang || '-'} | ${item.lokasi || '-'} | ${item.letak_barang || '-'}`;
+      opt.textContent = `${item.nama_barang} | ${item.gudang || '-'} | ${item.lokasi || '-'} | Retur: ${hitungStokRetur(item.id)}`;
       select.appendChild(opt);
     });
 }
 
 async function simpanReturBarang() {
-  const payload = {
-    no_retur: document.getElementById('retur_no').value.trim(),
-    tanggal: document.getElementById('retur_tanggal').value,
-    product_id: document.getElementById('retur_product').value,
-    jenis_retur: document.getElementById('retur_jenis').value,
-    qty: Number(document.getElementById('retur_qty').value || 0),
-    kondisi_barang: document.getElementById('retur_kondisi').value,
-    asal_retur: document.getElementById('retur_asal').value,
-    partner: document.getElementById('retur_partner').value.trim(),
-    gudang: document.getElementById('retur_gudang').value.trim(),
-    lokasi: document.getElementById('retur_lokasi').value.trim(),
-    alasan_retur: document.getElementById('retur_alasan').value.trim(),
-    keterangan: document.getElementById('retur_keterangan').value.trim(),
-    created_by: currentUser?.id || null
-  };
+  const noRetur = document.getElementById('retur_no').value.trim();
+  const tanggal = document.getElementById('retur_tanggal').value;
+  const productId = document.getElementById('retur_product').value;
+  const jenisRetur = document.getElementById('retur_jenis').value;
+  const qty = Number(document.getElementById('retur_qty').value || 0);
+  const kondisiBarang = document.getElementById('retur_kondisi').value;
+  const asalRetur = document.getElementById('retur_asal').value;
+  const partner = document.getElementById('retur_partner').value.trim();
+  const gudangInput = document.getElementById('retur_gudang').value.trim();
+  const lokasiInput = document.getElementById('retur_lokasi').value.trim();
+  const alasanRetur = document.getElementById('retur_alasan').value.trim();
+  const keteranganInput = document.getElementById('retur_keterangan').value.trim();
 
-  const barang = productsData.find(x => x.id === payload.product_id);
+  const barang = productsData.find(x => x.id === productId);
 
   if (!barang) return setDebug('Barang retur belum dipilih.', true);
-  if (!payload.no_retur) return setDebug('No retur kosong.', true);
-  if (!payload.tanggal) return setDebug('Tanggal retur wajib diisi.', true);
-  if (payload.qty <= 0) return setDebug('Qty retur harus lebih dari 0.', true);
+  if (!noRetur) return setDebug('No retur kosong.', true);
+  if (!tanggal) return setDebug('Tanggal retur wajib diisi.', true);
+  if (qty <= 0) return setDebug('Qty retur harus lebih dari 0.', true);
 
-  if (!payload.gudang) payload.gudang = barang.gudang || '';
-  if (!payload.lokasi) payload.lokasi = barang.lokasi || '';
+  const gudang = gudangInput || barang.gudang || '';
+  const lokasi = lokasiInput || barang.lokasi || '';
 
-  if (payload.jenis_retur === 'retur_keluar') {
-    const stokSaatIni = hitungStokBarang(payload.product_id);
-    if (payload.qty > stokSaatIni) {
-      return setDebug('Qty retur keluar melebihi stok saat ini: ' + stokSaatIni, true);
-    }
-  }
-
-  const { error: returError } = await client.from('stock_returns').insert([payload]);
-  if (returError) return setDebug('Gagal simpan retur: ' + returError.message, true);
-
-  if (payload.jenis_retur === 'retur_masuk' && payload.kondisi_barang === 'baik') {
-    const trxMasuk = {
-      product_id: payload.product_id,
+  // retur masuk = masuk ke stok retur, bukan stok utama
+  if (jenisRetur === 'retur_masuk') {
+    const payload = {
+      product_id: productId,
       jenis_transaksi: 'masuk',
-      jumlah: payload.qty,
-      gudang: payload.gudang,
-      lokasi: payload.lokasi,
-      keterangan: `Retur Masuk | ${payload.no_retur} | ${payload.partner || '-'} | ${payload.alasan_retur || '-'}`,
+      jumlah: qty,
+      gudang,
+      lokasi,
+      kategori_stok: 'retur',
+      jenis_retur: jenisRetur,
+      kondisi_barang: kondisiBarang,
+      partner: partner,
+      keterangan: `RETUR_MASUK | ${noRetur} | asal:${asalRetur} | alasan:${alasanRetur || '-'} | ${keteranganInput || '-'}`,
       created_by: currentUser?.id || null
     };
 
-    const { error: trxError } = await client.from('stock_transactions').insert([trxMasuk]);
-    if (trxError) return setDebug('Retur tersimpan, tapi stok masuk gagal: ' + trxError.message, true);
+    const { error } = await client.from('stock_transactions').insert([payload]);
+    if (error) return setDebug('Gagal simpan retur masuk: ' + error.message, true);
   }
 
-  if (payload.jenis_retur === 'retur_keluar') {
-    const trxKeluar = {
-      product_id: payload.product_id,
-      jenis_transaksi: 'keluar',
-      jumlah: payload.qty,
-      gudang: payload.gudang,
-      lokasi: payload.lokasi,
-      keterangan: `Retur Keluar | ${payload.no_retur} | ${payload.partner || '-'} | ${payload.alasan_retur || '-'}`,
-      created_by: currentUser?.id || null
-    };
+  // retur keluar = keluar dari stok retur, bukan dari stok utama
+  if (jenisRetur === 'retur_keluar') {
+    const stokReturSaatIni = hitungStokRetur(productId);
+    if (qty > stokReturSaatIni) {
+      return setDebug('Qty retur keluar melebihi stok retur saat ini: ' + stokReturSaatIni, true);
+    }
 
-    const { error: trxError } = await client.from('stock_transactions').insert([trxKeluar]);
-    if (trxError) return setDebug('Retur tersimpan, tapi stok keluar gagal: ' + trxError.message, true);
+const payload = {
+  product_id: productId,
+  jenis_transaksi: 'keluar',
+  kategori_stok: 'retur',
+  jumlah: qty,
+  gudang,
+  lokasi,
+  jenis_retur: jenisRetur,
+  kondisi_barang: kondisiBarang,
+  partner: partner,
+  keterangan: `RETUR_KELUAR | ${noRetur} | asal:${asalRetur} | alasan:${alasanRetur || '-'} | ${keteranganInput || '-'}`,
+  created_by: currentUser?.id || null
+};
+    const { error } = await client.from('stock_transactions').insert([payload]);
+    if (error) return setDebug('Gagal simpan retur keluar: ' + error.message, true);
   }
 
   setDebug('Data retur berhasil disimpan.');
-  await loadReturns();
   await loadTransactions();
   renderReturTable();
   renderProductsTable();
@@ -976,6 +943,8 @@ function renderReturTable() {
   const wrap = document.getElementById('returWrap');
   if (!wrap) return;
 
+  const returRows = transactionsData.filter(trx => (trx.kategori_stok || '') === 'retur');
+
   let html = `
     <table>
       <tr>
@@ -985,31 +954,33 @@ function renderReturTable() {
         <th>Barang</th>
         <th>Qty</th>
         <th>Kondisi</th>
-        <th>Asal</th>
-        <th>Supplier / Customer</th>
+        <th>Partner</th>
         <th>Gudang</th>
         <th>Lokasi</th>
-        <th>Alasan</th>
         <th>Keterangan</th>
       </tr>
   `;
 
-  returnsData.forEach(item => {
-    const barang = productsData.find(x => x.id === item.product_id);
+  returRows.forEach(trx => {
+    const barang = productsData.find(x => x.id === trx.product_id);
+
+    let noRetur = '-';
+    const ket = trx.keterangan || '';
+    const parts = ket.split('|').map(x => x.trim());
+    if (parts.length > 1) noRetur = parts[1];
+
     html += `
       <tr>
-        <td>${item.no_retur || ''}</td>
-        <td>${item.tanggal || ''}</td>
-        <td>${item.jenis_retur || ''}</td>
+        <td>${noRetur}</td>
+        <td>${trx.tanggal || ''}</td>
+        <td>${trx.jenis_retur || ''}</td>
         <td>${barang?.nama_barang || '-'}</td>
-        <td>${item.qty || 0}</td>
-        <td>${item.kondisi_barang || ''}</td>
-        <td>${item.asal_retur || ''}</td>
-        <td>${item.partner || ''}</td>
-        <td>${item.gudang || ''}</td>
-        <td>${item.lokasi || ''}</td>
-        <td>${item.alasan_retur || ''}</td>
-        <td>${item.keterangan || ''}</td>
+        <td>${trx.jumlah || 0}</td>
+        <td>${trx.kondisi_barang || ''}</td>
+        <td>${trx.partner || ''}</td>
+        <td>${trx.gudang || ''}</td>
+        <td>${trx.lokasi || ''}</td>
+        <td>${trx.keterangan || ''}</td>
       </tr>
     `;
   });
@@ -1017,20 +988,35 @@ function renderReturTable() {
   html += '</table>';
   wrap.innerHTML = html;
 }
+   function hitungStokBarang(productId) {
+  const barang = productsData.find(x => x.id === productId);
+  const stokAwal = Number(barang?.stok_awal || 0);
 
-    function hitungStokBarang(productId) {
-      const barang = productsData.find(x => x.id === productId);
-      const stokAwal = Number(barang?.stok_awal || 0);
-      let masuk = 0;
-      let keluar = 0;
-      transactionsData.forEach(trx => {
-        if (trx.product_id === productId) {
-          if (trx.jenis_transaksi === 'masuk') masuk += Number(trx.jumlah || 0);
-          if (trx.jenis_transaksi === 'keluar') keluar += Number(trx.jumlah || 0);
-        }
-      });
-      return stokAwal + masuk - keluar;
+  let masuk = 0;
+  let keluar = 0;
+
+  transactionsData.forEach(trx => {
+    if (trx.product_id === productId && (trx.kategori_stok || 'utama') === 'utama') {
+      if (trx.jenis_transaksi === 'masuk') masuk += Number(trx.jumlah || 0);
+      if (trx.jenis_transaksi === 'keluar') keluar += Number(trx.jumlah || 0);
     }
+  });
+
+  return stokAwal + masuk - keluar;
+}
+    function hitungStokRetur(productId) {
+  let masuk = 0;
+  let keluar = 0;
+
+  transactionsData.forEach(trx => {
+    if (trx.product_id === productId && (trx.kategori_stok || '') === 'retur') {
+      if (trx.jenis_transaksi === 'masuk') masuk += Number(trx.jumlah || 0);
+      if (trx.jenis_transaksi === 'keluar') keluar += Number(trx.jumlah || 0);
+    }
+  });
+
+  return masuk - keluar;
+}
 
     function statusStok(item) {
       const stok = hitungStokBarang(item.id);
@@ -1322,19 +1308,20 @@ function renderReturTable() {
   async function simpanBarangMasuk() {
   const supplier = document.getElementById('masuk_supplier').value.trim();
 
-  const payload = {
-    product_id: document.getElementById('masuk_product').value,
-    jenis_transaksi: 'masuk',
-    jumlah: Number(document.getElementById('masuk_jumlah').value || 0),
-    gudang: document.getElementById('masuk_gudang').value,
-    lokasi: document.getElementById('masuk_lokasi').value,
-    keterangan:
-      'Supplier: ' + supplier +
-      (document.getElementById('masuk_keterangan').value
-        ? ' | ' + document.getElementById('masuk_keterangan').value
-        : ''),
-    created_by: currentUser?.id || null
-  };
+const payload = {
+  product_id: document.getElementById('masuk_product').value,
+  jenis_transaksi: 'masuk',
+  kategori_stok: 'utama',
+  jumlah: Number(document.getElementById('masuk_jumlah').value || 0),
+  gudang: document.getElementById('masuk_gudang').value,
+  lokasi: document.getElementById('masuk_lokasi').value,
+  keterangan:
+    'Supplier: ' + supplier +
+    (document.getElementById('masuk_keterangan').value
+      ? ' | ' + document.getElementById('masuk_keterangan').value
+      : ''),
+  created_by: currentUser?.id || null
+};
 
   const barang = productsData.find(x => x.id === payload.product_id);
   if (!barang) return setDebug('Barang belum dipilih.', true);
