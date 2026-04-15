@@ -290,43 +290,46 @@
           <div id="productsTableWrap"></div>
         </div>
       </div>
-
-      <div id="tab-masuk" class="tab-content hidden">
-        <div class="card">
-          <h2>Barang Masuk</h2>
-          <div class="grid">
-            <div class="field">
-              <label>Cari Barang</label>
-              <input id="search_masuk" placeholder="ketik nama barang..." oninput="isiDropdownBarangMasuk()">
-            </div>
-            <div class="field">
-              <label>Pilih Barang</label>
-              <select id="masuk_product"></select>
-            </div>
-            <div class="field">
-              <label>Jumlah Masuk</label>
-              <input id="masuk_jumlah" type="number">
-            </div>
-            <div class="field">
-              <label>Gudang</label>
-              <input id="masuk_gudang">
-            </div>
-            <div class="field">
-              <label>Lokasi / Rak</label>
-              <input id="masuk_lokasi">
-            </div>
-            <div class="field">
-              <label>Keterangan</label>
-              <input id="masuk_keterangan">
-            </div>
-          </div>
-          <div class="actions">
-            <button class="btn" onclick="simpanBarangMasuk()">Simpan Barang Masuk</button>
-            <button class="btn secondary" onclick="exportBarangMasukExcel()">Export Excel</button>
-            <button class="btn secondary" onclick="exportBarangMasukPDF()">Export PDF</button>
-          </div>
-        </div>
+<div id="tab-masuk" class="tab-content hidden">
+  <div class="card">
+    <h2>Barang Masuk</h2>
+    <div class="grid">
+      <div class="field">
+        <label>Cari Barang</label>
+        <input id="search_masuk" placeholder="ketik nama barang..." oninput="isiDropdownBarangMasuk()">
       </div>
+      <div class="field">
+        <label>Pilih Barang</label>
+        <select id="masuk_product"></select>
+      </div>
+      <div class="field">
+        <label>Supplier</label>
+        <input id="masuk_supplier" placeholder="Nama supplier">
+      </div>
+      <div class="field">
+        <label>Jumlah Masuk</label>
+        <input id="masuk_jumlah" type="number">
+      </div>
+      <div class="field">
+        <label>Gudang</label>
+        <input id="masuk_gudang">
+      </div>
+      <div class="field">
+        <label>Lokasi / Rak</label>
+        <input id="masuk_lokasi">
+      </div>
+      <div class="field">
+        <label>Keterangan</label>
+        <input id="masuk_keterangan">
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" onclick="simpanBarangMasuk()">Simpan Barang Masuk</button>
+      <button class="btn secondary" onclick="exportBarangMasukExcel()">Export Excel</button>
+      <button class="btn secondary" onclick="exportBarangMasukPDF()">Export PDF</button>
+    </div>
+  </div>
+</div>
 
       <div id="tab-keluar" class="tab-content hidden">
         <div class="card">
@@ -1023,36 +1026,38 @@ async function loadProducts() {
       renderDashboard();
     }
 
-    async function simpanBarangMasuk() {
-      const payload = {
-        product_id: document.getElementById('masuk_product').value,
-        jenis_transaksi: 'masuk',
-        jumlah: Number(document.getElementById('masuk_jumlah').value || 0),
-        gudang: document.getElementById('masuk_gudang').value,
-        lokasi: document.getElementById('masuk_lokasi').value,
-        keterangan: document.getElementById('masuk_keterangan').value,
-        created_by: currentUser?.id || null
-      };
+  async function simpanBarangMasuk() {
+  const payload = {
+    product_id: document.getElementById('masuk_product').value,
+    jenis_transaksi: 'masuk',
+    supplier: document.getElementById('masuk_supplier').value.trim(),
+    jumlah: Number(document.getElementById('masuk_jumlah').value || 0),
+    gudang: document.getElementById('masuk_gudang').value,
+    lokasi: document.getElementById('masuk_lokasi').value,
+    keterangan: document.getElementById('masuk_keterangan').value,
+    created_by: currentUser?.id || null
+  };
 
-      const barang = productsData.find(x => x.id === payload.product_id);
-      if (!barang) return setDebug('Barang belum dipilih.', true);
-      if (payload.jumlah <= 0) return setDebug('Jumlah masuk harus lebih dari 0.', true);
-      if (!payload.gudang) payload.gudang = barang.gudang || '';
-      if (!payload.lokasi) payload.lokasi = barang.lokasi || '';
+  const barang = productsData.find(x => x.id === payload.product_id);
+  if (!barang) return setDebug('Barang belum dipilih.', true);
+  if (!payload.supplier) return setDebug('Supplier wajib diisi.', true);
+  if (payload.jumlah <= 0) return setDebug('Jumlah masuk harus lebih dari 0.', true);
+  if (!payload.gudang) payload.gudang = barang.gudang || '';
+  if (!payload.lokasi) payload.lokasi = barang.lokasi || '';
 
-      const { error } = await client.from('stock_transactions').insert([payload]);
-      if (error) return setDebug('Gagal simpan barang masuk: ' + error.message, true);
+  const { error } = await client.from('stock_transactions').insert([payload]);
+  if (error) return setDebug('Gagal simpan barang masuk: ' + error.message, true);
 
-      setDebug('Barang masuk berhasil disimpan.');
-      document.getElementById('masuk_jumlah').value = '';
-      document.getElementById('masuk_gudang').value = '';
-      document.getElementById('masuk_lokasi').value = '';
-      document.getElementById('masuk_keterangan').value = '';
-      await loadTransactions();
-      renderProductsTable();
-      renderDashboard();
-    }
-
+  setDebug('Barang masuk berhasil disimpan.');
+  document.getElementById('masuk_supplier').value = '';
+  document.getElementById('masuk_jumlah').value = '';
+  document.getElementById('masuk_gudang').value = '';
+  document.getElementById('masuk_lokasi').value = '';
+  document.getElementById('masuk_keterangan').value = '';
+  await loadTransactions();
+  renderProductsTable();
+  renderDashboard();
+}
     async function simpanBarangKeluar() {
       const payload = {
         product_id: document.getElementById('keluar_product').value,
@@ -1487,25 +1492,26 @@ async function importBarangCSV() {
       setDebug('Export stok barang sesuai filter ke PDF berhasil');
     }
 
-    function exportBarangMasukExcel() {
-      const rows = [['Tanggal','Kode Barang','Nama Barang','Jumlah','Gudang','Lokasi','Keterangan']];
-      transactionsData
-        .filter(trx => trx.jenis_transaksi === 'masuk')
-        .forEach(trx => {
-          const barang = productsData.find(x => x.id === trx.product_id);
-          rows.push([
-            trx.tanggal || '',
-            barang?.kode_barang || '',
-            barang?.nama_barang || '',
-            trx.jumlah || 0,
-            trx.gudang || '',
-            trx.lokasi || '',
-            trx.keterangan || ''
-          ]);
-        });
-      downloadCSV('barang-masuk.csv', rows);
-      setDebug('Export Excel barang masuk berhasil');
-    }
+   function exportBarangMasukExcel() {
+  const rows = [['Tanggal','Kode Barang','Nama Barang','Supplier','Jumlah','Gudang','Lokasi','Keterangan']];
+  transactionsData
+    .filter(trx => trx.jenis_transaksi === 'masuk')
+    .forEach(trx => {
+      const barang = productsData.find(x => x.id === trx.product_id);
+      rows.push([
+        trx.tanggal || '',
+        barang?.kode_barang || '',
+        barang?.nama_barang || '',
+        trx.supplier || '',
+        trx.jumlah || 0,
+        trx.gudang || '',
+        trx.lokasi || '',
+        trx.keterangan || ''
+      ]);
+    });
+  downloadCSV('barang-masuk.csv', rows);
+  setDebug('Export Excel barang masuk berhasil');
+}
 
     function exportBarangKeluarExcel() {
       const rows = [['Tanggal','Kode Barang','Nama Barang','Jumlah','Gudang','Lokasi','Keterangan']];
@@ -1547,24 +1553,25 @@ async function importBarangCSV() {
       setDebug('Export Excel opname berhasil');
     }
 
-    function exportBarangMasukPDF() {
-      const rows = transactionsData.filter(trx => trx.jenis_transaksi === 'masuk');
-      let html = '<table><tr><th>Tanggal</th><th>Kode</th><th>Nama Barang</th><th>Jumlah</th><th>Gudang</th><th>Lokasi</th><th>Keterangan</th></tr>';
-      rows.forEach(trx => {
-        const barang = productsData.find(x => x.id === trx.product_id);
-        html += `<tr>
-          <td>${trx.tanggal || ''}</td>
-          <td>${barang?.kode_barang || ''}</td>
-          <td>${barang?.nama_barang || ''}</td>
-          <td>${trx.jumlah || 0}</td>
-          <td>${trx.gudang || ''}</td>
-          <td>${trx.lokasi || ''}</td>
-          <td>${trx.keterangan || ''}</td>
-        </tr>`;
-      });
-      html += '</table>';
-      openPrintWindow('Barang Masuk', html);
-    }
+function exportBarangMasukPDF() {
+  const rows = transactionsData.filter(trx => trx.jenis_transaksi === 'masuk');
+  let html = '<table><tr><th>Tanggal</th><th>Kode</th><th>Nama Barang</th><th>Supplier</th><th>Jumlah</th><th>Gudang</th><th>Lokasi</th><th>Keterangan</th></tr>';
+  rows.forEach(trx => {
+    const barang = productsData.find(x => x.id === trx.product_id);
+    html += `<tr>
+      <td>${trx.tanggal || ''}</td>
+      <td>${barang?.kode_barang || ''}</td>
+      <td>${barang?.nama_barang || ''}</td>
+      <td>${trx.supplier || ''}</td>
+      <td>${trx.jumlah || 0}</td>
+      <td>${trx.gudang || ''}</td>
+      <td>${trx.lokasi || ''}</td>
+      <td>${trx.keterangan || ''}</td>
+    </tr>`;
+  });
+  html += '</table>';
+  openPrintWindow('Barang Masuk', html);
+}
 
     function exportBarangKeluarPDF() {
       const rows = transactionsData.filter(trx => trx.jenis_transaksi === 'keluar');
