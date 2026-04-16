@@ -368,7 +368,7 @@
           </div>
         </div>
       </div>
-      <div id="tab-retur" class="tab-content hidden">
+   <div id="tab-retur" class="tab-content hidden">
   <div class="card">
     <h2>Stok Barang Retur</h2>
     <div class="grid-3">
@@ -452,10 +452,41 @@
 
   <div class="card">
     <h2>Daftar Stok Retur</h2>
+
+    <div class="grid-4">
+      <div class="field">
+        <label>Cari No Retur / Barang / Partner</label>
+        <input id="retur_filter_text" oninput="renderReturTable()" placeholder="cari no retur / nama barang / partner">
+      </div>
+
+      <div class="field">
+        <label>Filter Jenis</label>
+        <select id="retur_filter_jenis" onchange="renderReturTable()">
+          <option value="">Semua</option>
+          <option value="retur_masuk">Retur Masuk</option>
+          <option value="retur_keluar">Retur Keluar</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Filter Gudang</label>
+        <input id="retur_filter_gudang" oninput="renderReturTable()" placeholder="gudang">
+      </div>
+
+      <div class="field">
+        <label>Filter Lokasi</label>
+        <input id="retur_filter_lokasi" oninput="renderReturTable()" placeholder="lokasi / rak">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn secondary" onclick="exportReturExcel()">Export Retur Excel</button>
+      <button class="btn secondary" onclick="exportReturPDF()">Export Retur PDF</button>
+    </div>
+
     <div id="returWrap"></div>
   </div>
 </div>
-
       <div id="tab-kartu" class="tab-content hidden">
         <div class="card">
           <h2>Kartu Stok</h2>
@@ -782,6 +813,7 @@ async function loadProducts() {
   renderProductsTable();
   isiDropdownBarangMasuk();
   isiDropdownBarangKeluar();
+  isiDropdownBarangRetur();
 }
   async function loadTransactions() {
   const { data, error } = await client
@@ -850,7 +882,36 @@ async function loadProducts() {
 
   return masuk - keluar;
 }
+function getFilteredReturRows() {
+  const text = (document.getElementById('retur_filter_text')?.value || '').toLowerCase();
+  const jenis = (document.getElementById('retur_filter_jenis')?.value || '').toLowerCase();
+  const gudang = (document.getElementById('retur_filter_gudang')?.value || '').toLowerCase();
+  const lokasi = (document.getElementById('retur_filter_lokasi')?.value || '').toLowerCase();
 
+  return transactionsData.filter(trx => {
+    if ((trx.kategori_stok || '') !== 'retur') return false;
+
+    const barang = productsData.find(x => x.id === trx.product_id);
+    const noRetur = ((trx.keterangan || '').split('|')[0] || '').trim();
+    const namaBarang = (barang?.nama_barang || '').toLowerCase();
+    const partner = (trx.partner || '').toLowerCase();
+    const gudangTrx = (trx.gudang || '').toLowerCase();
+    const lokasiTrx = (trx.lokasi || '').toLowerCase();
+    const jenisTrx = (trx.jenis_retur || '').toLowerCase();
+
+    const cocokText =
+      !text ||
+      noRetur.toLowerCase().includes(text) ||
+      namaBarang.includes(text) ||
+      partner.includes(text);
+
+    const cocokJenis = !jenis || jenisTrx === jenis;
+    const cocokGudang = !gudang || gudangTrx.includes(gudang);
+    const cocokLokasi = !lokasi || lokasiTrx.includes(lokasi);
+
+    return cocokText && cocokJenis && cocokGudang && cocokLokasi;
+  });
+}
     function statusStok(item) {
       const stok = hitungStokBarang(item.id);
       const min = Number(item.stok_minimum || 0);
@@ -1847,7 +1908,7 @@ function renderReturTable() {
   const wrap = document.getElementById('returWrap');
   if (!wrap) return;
 
-  const rows = transactionsData.filter(trx => (trx.kategori_stok || '') === 'retur');
+  const returRows = getFilteredReturRows();
 
   let html = `
     <table>
@@ -1863,13 +1924,128 @@ function renderReturTable() {
         <th>Lokasi</th>
         <th>Stok Retur</th>
         <th>Keterangan</th>
+        <th>Aksi</th>
       </tr>
   `;
 
-  rows.forEach(trx => {
+  if (!returRows.length) {
+    html += `<tr><td colspan="12">Belum ada data retur.</td></tr>`;
+  }
+
+  returRows.forEach(trx => {
     const barang = productsData.find(x => x.id === trx.product_id);
-    const keterangan = trx.keterangan || '';
-    const noRetur = keterangan.split('|')[0]?.trim() || '-';
+    const noRetur = ((trx.keterangan || '').split('|')[0] || '-').trim();
+
+    html += `
+      <tr>
+        <td>${noRetur}</td>
+        <td>${trx.tanggal || ''}</td>
+        <td>${trx.jenis_retur || ''}</td>
+        <td>${barang?.nama_barang || '-'}</td>
+        <td>${trx.jumlah || 0}</td>
+        <td>${trx.kondisi_barang || ''}</td>
+        <td>${trx.partner || ''}</td>
+        <td>${trx.gudang || ''}</td>
+        <td>${trx.lokasi || ''}</td>
+        <td>${hitungStokRetur(trx.product_id)}</td>
+        <td>${trx.keterangan || ''}</td>
+        <td>
+          <button class="btn danger" onclick="hapusRetur('${trx.id}')">Hapus</button>
+        </td>
+      </tr>
+    `;
+  });
+
+  html += '</table>';
+  wrap.innerHTML = html;
+}
+async function hapusRetur(id) {
+  if (!isAdmin()) return setDebug('Hanya admin yang bisa hapus retur.', true);
+  if (!confirm('Yakin hapus data retur ini?')) return;
+
+  const { error } = await client
+    .from('stock_transactions')
+    .delete()
+    .eq('id', id)
+    .eq('kategori_stok', 'retur');
+
+  if (error) {
+    return setDebug('Gagal hapus retur: ' + error.message, true);
+  }
+
+  setDebug('Data retur berhasil dihapus.');
+  await loadTransactions();
+  renderReturTable();
+  renderProductsTable();
+  renderDashboard();
+}
+    function exportReturExcel() {
+  const rowsData = getFilteredReturRows();
+
+  const rows = [[
+    'No Retur',
+    'Tanggal',
+    'Jenis',
+    'Nama Barang',
+    'Qty',
+    'Kondisi',
+    'Partner',
+    'Gudang',
+    'Lokasi',
+    'Stok Retur',
+    'Keterangan'
+  ]];
+
+  rowsData.forEach(trx => {
+    const barang = productsData.find(x => x.id === trx.product_id);
+    const noRetur = ((trx.keterangan || '').split('|')[0] || '-').trim();
+
+    rows.push([
+      noRetur,
+      trx.tanggal || '',
+      trx.jenis_retur || '',
+      barang?.nama_barang || '-',
+      trx.jumlah || 0,
+      trx.kondisi_barang || '',
+      trx.partner || '',
+      trx.gudang || '',
+      trx.lokasi || '',
+      hitungStokRetur(trx.product_id),
+      trx.keterangan || ''
+    ]);
+  });
+
+  downloadCSV('retur-barang.csv', rows);
+  setDebug('Export retur Excel berhasil.');
+}
+
+function exportReturPDF() {
+  const rowsData = getFilteredReturRows();
+
+  let html = `
+    <table>
+      <tr>
+        <th>No Retur</th>
+        <th>Tanggal</th>
+        <th>Jenis</th>
+        <th>Nama Barang</th>
+        <th>Qty</th>
+        <th>Kondisi</th>
+        <th>Partner</th>
+        <th>Gudang</th>
+        <th>Lokasi</th>
+        <th>Stok Retur</th>
+        <th>Keterangan</th>
+      </tr>
+  `;
+
+  if (!rowsData.length) {
+    html += `<tr><td colspan="11">Belum ada data retur.</td></tr>`;
+  }
+
+  rowsData.forEach(trx => {
+    const barang = productsData.find(x => x.id === trx.product_id);
+    const noRetur = ((trx.keterangan || '').split('|')[0] || '-').trim();
 
     html += `
       <tr>
@@ -1889,9 +2065,9 @@ function renderReturTable() {
   });
 
   html += '</table>';
-  wrap.innerHTML = html;
+  openPrintWindow('Laporan Retur Barang', html);
+  setDebug('Export retur PDF berhasil.');
 }
-
 window.addEventListener('load', cekSession);
 
 function toggleCheckAllBarang(source) {
